@@ -117,8 +117,8 @@ export function JobOffersList({ jobId, offers, onUpdate }: { jobId: string; offe
                   Assign Worker
                 </Button>
                 <Dialog>
-                  <DialogTrigger>
-                    <Button variant="outline">Counter-Offer</Button>
+                  <DialogTrigger render={<Button variant="outline" disabled={responding === offer.id} />}>
+                    Counter-Offer
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>

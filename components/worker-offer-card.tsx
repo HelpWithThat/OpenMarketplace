@@ -136,8 +136,8 @@ export function WorkerOfferCard({ offer, jobId, onUpdate }: { offer: any; jobId:
                 Accept Counter-Offer
               </Button>
               <Dialog>
-                <DialogTrigger>
-                  <Button variant="outline">Make New Counter-Offer</Button>
+                <DialogTrigger render={<Button variant="outline" disabled={responding} />}>
+                  Make New Counter-Offer
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>

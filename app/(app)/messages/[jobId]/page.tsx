@@ -43,5 +43,10 @@ export default async function MessagesPage({ params }: { params: Promise<{ jobId
     redirect('/dashboard')
   }
 
+  await prisma.messageThreadParticipant.updateMany({
+    where: { threadId: thread.id, userId },
+    data: { lastReadAt: new Date() },
+  })
+
   return <MessagingUI thread={thread} userId={userId} />
 }
