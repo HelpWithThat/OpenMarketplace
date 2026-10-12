@@ -1,0 +1,1010 @@
+// Prisma schema for Open Marketplace
+// Based on product plan section 9: Data model
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// USER & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  password      String? // hashed, nullable for social login
+  phone         String?   @unique
+  phoneVerified DateTime?
+  
+  name          String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Roles - user can be both
+  isWorker      Boolean   @default(false)
+  isBuyer       Boolean   @default(false)
+  
+  status        UserStatus @default(ACTIVE)
+  
+  // Relations
+  workerProfile WorkerProfile?
+  buyerProfile  BuyerProfile?
+  
+  // Jobs
+  postedJobs    Job[]       @relation("JobBuyer")
+  offers        Offer[]
+  assignments   Assignment[]
+  
+  // Ratings
+  givenReviews    Review[]  @relation("ReviewFrom")
+  receivedReviews Review[]  @relation("ReviewTo")
+  
+  // Messages
+  messages        Message[]
+  messageThreads  MessageThreadParticipant[]
+  
+  // Smart Matches
+  smartMatches    SmartMatch[]
+  
+  // Notifications
+  notifications   Notification[]
+  
+  // Reports
+  reportsCreated  Report[]  @relation("ReportCreator")
+  reportsAbout    Report[]  @relation("ReportSubject")
+  
+  @@index([email])
+  @@index([phone])
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+// ============================================================================
+// WORKER PROFILE
+// ============================================================================
+
+model WorkerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  photo           String?
+  bio             String?
+  displayName     String
+  
+  // Skills & Experience
+  skills          String[] // Array of skill names
+  yearsExperience Int?
+  tools           String[] // Tools and equipment
+  certifications  WorkerCertification[]
+  
+  // Location
+  publicCity      String?  // Public display: "Denver 80202"
+  publicZip       String?
+  travelRadius    Int?     // Miles
+  privateBaseLat  Float?   // For distance calculations
+  privateBaseLng  Float?
+  
+  // Availability
+  availability    Json?    // {days: [], hours: {start: "9:00", end: "17:00"}}
+  
+  // Stats
+  averageRating   Float    @default(0)
+  totalReviews    Int      @default(0)
+  completedJobs   Int      @default(0)
+  acceptedJobs    Int      @default(0)
+  reliability     Float    @default(0) // completedJobs / acceptedJobs
+  
+  // Rating breakdown
+  ratingOnTime         Float @default(0)
+  ratingQuality        Float @default(0)
+  ratingCommunication  Float @default(0)
+  wouldHireAgainPct    Float @default(0)
+  
+  // Payout info
+  stripeAccountId String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([publicZip])
+  @@index([averageRating])
+}
+
+model WorkerCertification {
+  id              String   @id @default(cuid())
+  workerProfileId String
+  workerProfile   WorkerProfile @relation(fields: [workerProfileId], references: [id], onDelete: Cascade)
+  
+  name            String
+  fileUrl         String?
+  verified        Boolean  @default(false)
+  verifiedAt      DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([workerProfileId])
+}
+
+// ============================================================================
+// BUYER PROFILE
+// ============================================================================
+
+model BuyerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  businessName    String?
+  logo            String?
+  description     String?
+  
+  // Default location for jobs (private)
+  defaultAddress  String?
+  defaultLat      Float?
+  defaultLng      Float?
+  
+  // Payment method ref
+  stripeCustomerId String?
+  
+  // Stats
+  averageRating   Float    @default(0)
+  totalReviews    Int      @default(0)
+  totalJobs       Int      @default(0)
+  
+  // Rating breakdown
+  ratingClearInstructions Float @default(0)
+  ratingFairPayment       Float @default(0)
+  ratingRespect           Float @default(0)
+  wouldWorkForAgainPct    Float @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================================================
+// JOBS
+// ============================================================================
+
+model Job {
+  id            String   @id @default(cuid())
+  buyerId       String
+  buyer         User     @relation("JobBuyer", fields: [buyerId], references: [id])
+  
+  // Basics
+  title         String
+  description   String
+  categories    String[] // Array of category tags
+  
+  // Location
+  locationType  LocationType
+  address       String?  // Kept private until assignment
+  city          String?  // Public
+  lat           Float?
+  lng           Float?
+  
+  // Schedule
+  scheduleType  ScheduleType
+  startWindow   DateTime?  // For WINDOW type
+  endWindow     DateTime?
+  fixedTime     DateTime?  // For FIXED type
+  deadline      DateTime?  // For ANYTIME type
+  estimatedDuration Int?   // Minutes
+  
+  // Pay
+  payType       PayType
+  fixedPrice    Float?
+  hourlyRate    Float?
+  maxHours      Float?
+  openToOffers  Boolean   @default(false)
+  
+  // Expenses
+  expensesAllowed Boolean @default(true)
+  expenseBudget   Float?
+  
+  // Requirements
+  requirements  JobRequirement[]
+  
+  // Visibility & Selection
+  visibility    JobVisibility @default(PUBLIC)
+  selectionMode SelectionMode @default(REVIEW)
+  
+  // Files
+  attachments   JobAttachment[]
+  
+  // Task Template
+  taskSections  TaskSection[]
+  
+  // Status
+  status        JobStatus @default(DRAFT)
+  
+  // Relations
+  offers        Offer[]
+  assignment    Assignment?
+  messageThread MessageThread?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  publishedAt   DateTime?
+  
+  @@index([buyerId])
+  @@index([status])
+  @@index([city])
+  @@index([publishedAt])
+}
+
+enum LocationType {
+  ON_SITE
+  REMOTE
+  WORKER_CHOICE
+}
+
+enum ScheduleType {
+  FIXED
+  WINDOW
+  ANYTIME
+}
+
+enum PayType {
+  FIXED
+  HOURLY
+}
+
+enum JobVisibility {
+  PUBLIC
+  INVITE_ONLY
+  PAST_WORKERS_FIRST
+}
+
+enum SelectionMode {
+  REVIEW
+  INSTANT_BOOK
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  PAID
+  CANCELLED
+  DISPUTED
+}
+
+model JobRequirement {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  type        RequirementType
+  value       String
+  required    Boolean  @default(true) // "must have" vs "nice to have"
+  
+  @@index([jobId])
+}
+
+enum RequirementType {
+  SKILL
+  TOOL
+  CERTIFICATION
+  MIN_RATING
+  BACKGROUND_CHECK
+}
+
+model JobAttachment {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  fileUrl     String
+  fileName    String
+  fileType    String
+  uploadedAt  DateTime @default(now())
+  
+  @@index([jobId])
+}
+
+// ============================================================================
+// TASK BUILDER
+// ============================================================================
+
+model TaskSection {
+  id          String   @id @default(cuid())
+  jobId       String?
+  job         Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  templateId  String?
+  template    TaskTemplate? @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  name        String
+  order       Int
+  
+  steps       TaskStep[]
+  
+  @@index([jobId])
+  @@index([templateId])
+}
+
+model TaskStep {
+  id          String   @id @default(cuid())
+  sectionId   String
+  section     TaskSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  
+  order       Int
+  type        TaskStepType
+  title       String
+  instructions String?
+  required    Boolean  @default(false)
+  
+  // Settings (JSON for flexibility)
+  settings    Json?    // {minPhotos: 2, maxPhotos: 5, choices: ["A", "B"], ...}
+  
+  // Conditional logic
+  showIfStepId String?
+  showIfValue  String?
+  
+  // Results
+  results     TaskResult[]
+  
+  @@index([sectionId])
+}
+
+enum TaskStepType {
+  CHECKBOX
+  CHECK_IN
+  CHECK_OUT
+  PHOTO
+  TEXT
+  NUMBER
+  TIME
+  DATE
+  YES_NO
+  MULTIPLE_CHOICE
+  PHONE_CALL
+  SIGNATURE
+  FILE_UPLOAD
+}
+
+model TaskTemplate {
+  id          String   @id @default(cuid())
+  ownerId     String   // User ID
+  
+  name        String
+  sections    TaskSection[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([ownerId])
+}
+
+// ============================================================================
+// OFFERS & ASSIGNMENTS
+// ============================================================================
+
+model Offer {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  workerId    String
+  worker      User     @relation(fields: [workerId], references: [id])
+  
+  type        OfferType
+  round       Int      @default(1) // 1-3
+  
+  // Proposed terms
+  proposedPay Float?
+  proposedHours Float?
+  proposedSchedule DateTime?
+  note        String?
+  counterNote String?
+  
+  status      OfferStatus
+  expiresAt   DateTime
+  
+  createdAt   DateTime @default(now())
+  respondedAt DateTime?
+  
+  @@index([jobId])
+  @@index([workerId])
+  @@index([status])
+}
+
+enum OfferType {
+  REQUEST      // "I'll do it as posted"
+  COUNTER      // Worker proposes changes
+  BUYER_COUNTER // Buyer counters back
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  APPROVED
+  REJECTED
+  COUNTER_OFFER
+}
+
+model Assignment {
+  id          String   @id @default(cuid())
+  jobId       String   @unique
+  job         Job      @relation(fields: [jobId], references: [id])
+  
+  workerId    String
+  worker      User     @relation(fields: [workerId], references: [id])
+  
+  // Agreed terms (snapshot at assignment time)
+  agreedPay   Float
+  agreedHours Float?
+  agreedSchedule DateTime?
+  
+  // Fee settings snapshot
+  feeRate     Float    @default(0.20)
+  feeSplitBuyer Float  @default(0.80)
+  feeSplitWorker Float @default(0.20)
+  
+  // Check in/out
+  checkInAt   DateTime?
+  checkInLat  Float?
+  checkInLng  Float?
+  checkOutAt  DateTime?
+  checkOutLat Float?
+  checkOutLng Float?
+  
+  // Final hours (for hourly jobs)
+  approvedHours Float?
+  
+  // Status
+  status      AssignmentStatus @default(UPCOMING)
+  
+  // Expenses
+  expenses    ExpenseItem[]
+  
+  // Task results
+  taskResults TaskResult[]
+  
+  // Payment
+  payment     Payment?
+  
+  // Approval
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  autoApproveAt DateTime?
+  
+  // Penalties
+  penalties   Penalty[]
+  
+  // Dispute
+  dispute     Dispute?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([workerId])
+  @@index([status])
+}
+
+enum AssignmentStatus {
+  UPCOMING
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+// ============================================================================
+// TASK RESULTS
+// ============================================================================
+
+model TaskResult {
+  id          String   @id @default(cuid())
+  assignmentId String
+  assignment  Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  stepId      String
+  step        TaskStep @relation(fields: [stepId], references: [id])
+  
+  // Result data
+  textValue   String?
+  numberValue Float?
+  boolValue   Boolean?
+  dateValue   DateTime?
+  jsonValue   Json?    // For multiple choice, etc.
+  
+  // Files
+  files       TaskResultFile[]
+  
+  // Signature
+  signature   String?  // Base64 image
+  signerName  String?
+  
+  // Location (for check-in/out)
+  lat         Float?
+  lng         Float?
+  
+  completedAt DateTime @default(now())
+  
+  @@unique([assignmentId, stepId])
+  @@index([assignmentId])
+  @@index([stepId])
+}
+
+model TaskResultFile {
+  id          String   @id @default(cuid())
+  resultId    String
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  
+  fileUrl     String
+  fileName    String
+  fileType    String
+  uploadedAt  DateTime @default(now())
+  
+  @@index([resultId])
+}
+
+// ============================================================================
+// EXPENSES
+// ============================================================================
+
+model ExpenseItem {
+  id          String   @id @default(cuid())
+  assignmentId String
+  assignment  Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  type        ExpenseType
+  amount      Float
+  receiptUrl  String?
+  note        String?
+  
+  status      ExpenseStatus @default(PENDING)
+  approvedAt  DateTime?
+  
+  feeExempt   Boolean  @default(true) // Always true per plan
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([assignmentId])
+}
+
+enum ExpenseType {
+  TRAVEL
+  PARKING
+  TOLLS
+  MATERIALS
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================================
+// PAYMENTS & FEES
+// ============================================================================
+
+model FeeSettings {
+  id          String   @id @default(cuid())
+  
+  feeRate     Float    @default(0.20)    // 20%
+  feeSplitBuyer Float  @default(0.80)    // 80% or 70%
+  feeSplitWorker Float @default(0.20)    // 20% or 30%
+  
+  processingFeePayer ProcessingFeePayer @default(PLATFORM)
+  
+  effectiveDate DateTime @default(now())
+  
+  // Promo overrides can be added later
+  
+  @@index([effectiveDate])
+}
+
+enum ProcessingFeePayer {
+  PLATFORM
+  BUYER
+  MIXED
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  assignmentId String  @unique
+  assignment  Assignment @relation(fields: [assignmentId], references: [id])
+  
+  provider    PaymentProvider
+  providerRef String?  // External transaction ID
+  
+  // Amounts (in cents to avoid float issues, but stored as float for simplicity)
+  laborAmount Float
+  buyerFee    Float
+  workerFee   Float
+  platformFeeTotal Float
+  expensesTotal Float
+  penaltiesTotal Float @default(0)
+  
+  buyerTotal  Float
+  workerPayout Float
+  
+  processingFee Float?
+  
+  status      PaymentStatus
+  
+  // Ledger
+  ledgerEntries LedgerEntry[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  paidAt      DateTime?
+  
+  @@index([assignmentId])
+  @@index([status])
+}
+
+enum PaymentProvider {
+  MOCK
+  STRIPE
+  PAZZIX  // Future
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD
+  RELEASED
+  PAID_OUT
+  REFUNDED
+  DISPUTED
+}
+
+model LedgerEntry {
+  id          String   @id @default(cuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  
+  type        LedgerEntryType
+  amount      Float
+  
+  timestamp   DateTime @default(now())
+  note        String?
+  
+  @@index([paymentId])
+  @@index([timestamp])
+}
+
+enum LedgerEntryType {
+  HOLD
+  RELEASE
+  REFUND
+  BUYER_FEE
+  WORKER_FEE
+  EXPENSE_REIMBURSEMENT
+  PROCESSING_FEE
+  PENALTY
+  PAYOUT
+}
+
+// ============================================================================
+// PENALTIES & DISPUTES
+// ============================================================================
+
+model Penalty {
+  id          String   @id @default(cuid())
+  assignmentId String
+  assignment  Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  
+  rule        String   // e.g., "Late without notice"
+  amount      Float
+  percentage  Float?
+  reason      String
+  
+  status      PenaltyStatus @default(APPLIED)
+  disputedAt  DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([assignmentId])
+}
+
+enum PenaltyStatus {
+  APPLIED
+  DISPUTED
+  UPHELD
+  REVERSED
+}
+
+model Dispute {
+  id          String   @id @default(cuid())
+  assignmentId String  @unique
+  assignment  Assignment @relation(fields: [assignmentId], references: [id])
+  
+  openedBy    String   // User ID
+  reason      DisputeReason
+  description String
+  evidenceUrls String[]
+  
+  amountHeld  Float
+  
+  decision    DisputeDecision?
+  decisionNote String?
+  decidedAt   DateTime?
+  
+  appealedAt  DateTime?
+  appealNote  String?
+  
+  status      DisputeStatus @default(OPEN)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([status])
+}
+
+enum DisputeReason {
+  NOT_DONE
+  POOR_QUALITY
+  UNFAIR_PENALTY
+  PAYMENT_NOT_APPROVED
+  SAFETY
+  OTHER
+}
+
+enum DisputeDecision {
+  FULL_PAY
+  PARTIAL_PAY
+  REFUND
+}
+
+enum DisputeStatus {
+  OPEN
+  IN_REVIEW
+  DECIDED
+  APPEALED
+  CLOSED
+}
+
+// ============================================================================
+// SMART MATCH
+// ============================================================================
+
+model SmartMatch {
+  id          String   @id @default(cuid())
+  workerId    String
+  worker      User     @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  
+  name        String
+  
+  // Criteria
+  maxDistance Int?
+  minPay      Float?
+  minRate     Float?
+  categories  String[]
+  preferredBuyerIds String[]
+  onlyPastBuyers Boolean @default(false)
+  scheduleRules Json?
+  remoteOnly  Boolean @default(false)
+  mustMatchRequirements Boolean @default(false)
+  
+  // Alerts
+  alertMode   AlertMode @default(PUSH)
+  quietHours  Json?     // {start: "22:00", end: "08:00"}
+  
+  active      Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([workerId])
+  @@index([active])
+}
+
+enum AlertMode {
+  PUSH
+  DAILY_DIGEST
+  NONE
+}
+
+// ============================================================================
+// MESSAGING
+// ============================================================================
+
+model MessageThread {
+  id          String   @id @default(cuid())
+  jobId       String   @unique
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  participants MessageThreadParticipant[]
+  messages    Message[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([jobId])
+}
+
+model MessageThreadParticipant {
+  id          String   @id @default(cuid())
+  threadId    String
+  thread      MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  lastReadAt  DateTime?
+  
+  @@unique([threadId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  threadId    String
+  thread      MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  
+  senderId    String
+  sender      User     @relation(fields: [senderId], references: [id])
+  
+  text        String
+  attachments MessageAttachment[]
+  
+  sentAt      DateTime @default(now())
+  
+  @@index([threadId])
+  @@index([senderId])
+}
+
+model MessageAttachment {
+  id          String   @id @default(cuid())
+  messageId   String
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  
+  fileUrl     String
+  fileName    String
+  fileType    String
+  
+  @@index([messageId])
+}
+
+// ============================================================================
+// REVIEWS
+// ============================================================================
+
+model Review {
+  id          String   @id @default(cuid())
+  jobId       String
+  
+  fromId      String
+  from        User     @relation("ReviewFrom", fields: [fromId], references: [id])
+  
+  toId        String
+  to          User     @relation("ReviewTo", fields: [toId], references: [id])
+  
+  overallStars Int     // 1-5
+  
+  // Worker reviews (when reviewing a worker)
+  onTime      Int?
+  quality     Int?
+  communication Int?
+  wouldHireAgain Boolean?
+  
+  // Buyer reviews (when reviewing a buyer)
+  clearInstructions Int?
+  fairPayment Int?
+  respect     Int?
+  wouldWorkForAgain Boolean?
+  
+  comment     String?
+  reply       String?  // One public reply allowed
+  
+  visibleAt   DateTime? // Revealed when both reviews are in
+  
+  createdAt   DateTime @default(now())
+  repliedAt   DateTime?
+  
+  @@index([jobId])
+  @@index([fromId])
+  @@index([toId])
+  @@index([visibleAt])
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        NotificationType
+  title       String
+  message     String
+  linkUrl     String?
+  
+  read        Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+  
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  JOB_MATCH
+  JOB_INVITE
+  OFFER_RECEIVED
+  OFFER_ACCEPTED
+  OFFER_DECLINED
+  JOB_ASSIGNED
+  MESSAGE_RECEIVED
+  PAYMENT_APPROVED
+  PAYMENT_RELEASED
+  REVIEW_RECEIVED
+  DISPUTE_UPDATE
+}
+
+// ============================================================================
+// REPORTS & SAFETY
+// ============================================================================
+
+model Report {
+  id          String   @id @default(cuid())
+  
+  createdById String
+  createdBy   User     @relation("ReportCreator", fields: [createdById], references: [id])
+  
+  subjectId   String   // User or Job ID
+  subjectType ReportSubjectType
+  subject     User?    @relation("ReportSubject", fields: [subjectId], references: [id])
+  
+  reason      ReportReason
+  description String
+  evidenceUrls String[]
+  
+  status      ReportStatus @default(PENDING)
+  adminAction String?
+  adminNote   String?
+  resolvedAt  DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([subjectId])
+  @@index([status])
+}
+
+enum ReportSubjectType {
+  USER
+  JOB
+}
+
+enum ReportReason {
+  SPAM
+  SCAM
+  INAPPROPRIATE
+  HARASSMENT
+  SAFETY_CONCERN
+  PROHIBITED_WORK
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
