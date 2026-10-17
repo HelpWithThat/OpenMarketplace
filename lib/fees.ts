@@ -1,5 +1,5 @@
 /**
- * Fee Calculator for Open Marketplace
+ * Fee Calculator for HelpWithThat
  * 
  * Based on product plan section 5:
  * - Platform fee is 20% of labor value

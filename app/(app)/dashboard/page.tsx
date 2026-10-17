@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { BrandBanner } from '@/components/brand-banner'
+import { config } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,15 +80,20 @@ export default async function DashboardPage() {
 
   return (
     <div className="container max-w-6xl space-y-6 px-4 py-8">
-      <div>
-        <h1 className="mb-2 text-3xl font-bold">Welcome back, {user.name}!</h1>
-        <p className="text-muted-foreground">
-          {user.isWorker && user.isBuyer
-            ? 'Manage your jobs and work from here'
-            : user.isWorker
-            ? 'Find and manage your work'
-            : 'Post and manage your jobs'}
-        </p>
+      <div className="space-y-4">
+        <BrandBanner variant="compact" />
+        <div>
+          <h1 className="mb-2 text-3xl font-bold">
+            Welcome back to {config.app.name}, {user.name}!
+          </h1>
+          <p className="text-muted-foreground">
+            {user.isWorker && user.isBuyer
+              ? 'Get help with tasks, or help someone else get a job done.'
+              : user.isWorker
+              ? 'Find jobs and help people with the tasks they need done.'
+              : 'Post a job and get help with the tasks on your list.'}
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

@@ -1,6 +1,6 @@
 export const config = {
   app: {
-    name: process.env.APP_NAME || 'Open Marketplace',
+    name: process.env.APP_NAME || 'HelpWithThat',
     url: process.env.APP_URL || 'http://localhost:43891',
   },
   fees: {

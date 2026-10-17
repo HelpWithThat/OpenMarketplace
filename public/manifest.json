@@ -1,7 +1,7 @@
 {
-  "name": "Open Marketplace",
-  "short_name": "Marketplace",
-  "description": "An open marketplace for any kind of work",
+  "name": "HelpWithThat",
+  "short_name": "HelpWithThat",
+  "description": "Get help with tasks and jobs",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FBF7F4",

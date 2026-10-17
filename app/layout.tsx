@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: config.app.name,
-  description: 'An open marketplace for any kind of work',
+  description: 'Get help with tasks and jobs — post work or pick up a job on HelpWithThat',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
