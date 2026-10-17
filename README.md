@@ -1,10 +1,10 @@
-# Open Marketplace
+# HelpWithThat
 
-A mobile-first PWA marketplace where anyone can post jobs and anyone qualified can work on them. Built for Joe Thomas.
+A mobile-first PWA marketplace where anyone can post jobs and anyone qualified can work on them. Built for Joe Thomas. People need help with things — HelpWithThat is the market name.
 
 ## What It Is
 
-An open marketplace for any kind of work: mount a TV, count inventory, design a logo, move furniture, or anything else. Buyers post jobs with custom task checklists, workers browse and request jobs, and money is held safely until work is approved.
+Get help with tasks and jobs: mount a TV, count inventory, design a logo, move furniture, or anything else. Buyers post jobs with custom task checklists, workers browse and request jobs, and money is held safely until work is approved.
 
 ## Key Features
 

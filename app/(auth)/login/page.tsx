@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { BrandBanner } from '@/components/brand-banner'
+import { config } from '@/lib/config'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -45,11 +47,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-8">
+    <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
+      <div className="mb-6 w-full max-w-md space-y-3 text-center">
+        <BrandBanner />
+        <h1 className="text-2xl font-bold sm:text-3xl">{config.app.name}</h1>
+        <p className="text-muted-foreground">
+          People need help with things. Sign in to post a job, pick up work, or get help
+          with the tasks on your list.
+        </p>
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl">Log in</CardTitle>
-          <CardDescription>Log in to your account</CardDescription>
+          <CardDescription>Welcome back — let&apos;s get help with that.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">

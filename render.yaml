@@ -16,6 +16,8 @@ services:
           property: connectionString
       - key: APP_URL
         sync: false
+      - key: APP_NAME
+        value: "HelpWithThat"
 
 databases:
   - name: open-marketplace-db

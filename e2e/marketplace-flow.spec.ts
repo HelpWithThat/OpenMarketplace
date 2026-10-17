@@ -3,7 +3,7 @@ import path from 'path'
 
 const ARTIFACTS_DIR = '/opt/cursor/artifacts'
 
-test.describe('Open Marketplace E2E Flow', () => {
+test.describe('HelpWithThat E2E Flow', () => {
   test.use({ 
     viewport: { width: 390, height: 844 },
   })
