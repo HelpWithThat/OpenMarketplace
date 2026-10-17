@@ -49,7 +49,7 @@ export default function LoginPage() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
       <div className="mb-6 w-full max-w-md space-y-3 text-center">
-        <BrandBanner variant="hero" />
+        <BrandBanner />
         <h1 className="text-2xl font-bold sm:text-3xl">{config.app.name}</h1>
         <p className="text-muted-foreground">
           People need help with things. Sign in to post a job, pick up work, or get help
