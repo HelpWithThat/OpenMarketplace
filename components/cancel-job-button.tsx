@@ -3,14 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { cancelCopy, WORKER_CANCEL_PENALTY_USD, type CancelRole } from '@/lib/cancel'
 
@@ -25,7 +17,7 @@ export function CancelJobButton({
 }) {
   const router = useRouter()
   const copy = cancelCopy(role, false)
-  const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -42,7 +34,7 @@ export function CancelJobButton({
       if (!res.ok) {
         throw new Error(data.error || 'Could not cancel this job')
       }
-      setOpen(false)
+      setConfirming(false)
       router.refresh()
     } catch (err: any) {
       setError(err.message)
@@ -58,57 +50,57 @@ export function CancelJobButton({
         ? 'If any payment was held, it will be sent back to you.'
         : null
 
-  return (
-    <>
+  if (!confirming) {
+    return (
       <Button
         type="button"
         size="lg"
         className="h-12 min-h-12 w-full px-6 text-base sm:w-auto"
         onClick={() => {
           setError('')
-          setOpen(true)
+          setConfirming(true)
         }}
       >
         {copy.buttonLabel}
       </Button>
+    )
+  }
 
-      <Dialog open={open} onOpenChange={(nextOpen) => setOpen(nextOpen)}>
-        <DialogContent className="sm:max-w-md" showCloseButton={!submitting}>
-          <DialogHeader>
-            <DialogTitle className="text-xl">{copy.title}</DialogTitle>
-            <DialogDescription className="text-base leading-relaxed">
-              {copy.body}
-              {penaltyNote ? ` ${penaltyNote}` : ''}
-            </DialogDescription>
-          </DialogHeader>
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <DialogFooter className="gap-2 sm:justify-stretch">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="h-12 flex-1 text-base"
-              disabled={submitting}
-              onClick={() => setOpen(false)}
-            >
-              {copy.keepLabel}
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              className="h-12 flex-1 text-base"
-              disabled={submitting}
-              onClick={handleCancel}
-            >
-              {submitting ? 'Cancelling…' : copy.confirmLabel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+  return (
+    <div className="space-y-4 rounded-xl border border-border bg-card p-4 ring-1 ring-foreground/10">
+      <div className="space-y-2">
+        <p className="text-xl font-semibold">{copy.title}</p>
+        <p className="text-base leading-relaxed text-muted-foreground">
+          {copy.body}
+          {penaltyNote ? ` ${penaltyNote}` : ''}
+        </p>
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      <div className="flex flex-col gap-3">
+        <Button
+          type="button"
+          size="lg"
+          className="h-12 w-full text-base"
+          disabled={submitting}
+          onClick={handleCancel}
+        >
+          {submitting ? 'Cancelling…' : copy.confirmLabel}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="h-12 w-full text-base"
+          disabled={submitting}
+          onClick={() => setConfirming(false)}
+        >
+          {copy.keepLabel}
+        </Button>
+      </div>
+    </div>
   )
 }
