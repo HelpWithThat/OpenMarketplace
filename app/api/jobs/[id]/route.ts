@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-privacy'
+import { assignmentForDisplay } from '@/lib/assignment'
 
 export async function GET(
   _req: NextRequest,
@@ -53,10 +54,11 @@ export async function GET(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    const role = moneyRoleForUser(user, job)
-    const fees = feesForJob(job, role)
+    const viewJob = { ...job, assignment: assignmentForDisplay(job) }
+    const role = moneyRoleForUser(user, viewJob)
+    const fees = feesForJob(viewJob, role)
     return NextResponse.json(
-      omitCrossSideMoney({ job: { ...job, fees } }, role)
+      omitCrossSideMoney({ job: { ...viewJob, fees } }, role)
     )
   } catch (error) {
     console.error('Get job error:', error)

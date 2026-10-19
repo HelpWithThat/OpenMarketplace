@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       },
     })
 
-    if (!assignment) {
+    if (!assignment || assignment.status === 'CANCELLED') {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
     }
 

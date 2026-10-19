@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import { JobDetailClient } from '@/components/job-detail-client'
 import { feesForJob, moneyRoleForUser } from '@/lib/fee-privacy'
+import { assignmentForDisplay } from '@/lib/assignment'
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -44,11 +45,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     notFound()
   }
 
-  const role = moneyRoleForUser(user, job)
-  const fees = feesForJob(job, role)
+  const viewJob = { ...job, assignment: assignmentForDisplay(job) }
+  const role = moneyRoleForUser(user, viewJob)
+  const fees = feesForJob(viewJob, role)
   return (
     <JobDetailClient
-      job={job}
+      job={viewJob}
       userId={userId}
       isWorker={user.isWorker}
       isBuyer={job.buyerId === userId}

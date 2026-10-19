@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { calculateFees } from '@/lib/fees'
 import { feeViewForRole, omitCrossSideMoney } from '@/lib/fee-privacy'
 import { getPaymentProvider } from '@/lib/payments'
+import { bumpCompletedJobs } from '@/lib/assignment'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    if (!job.assignment) {
+    if (!job.assignment || job.assignment.status === 'CANCELLED') {
       return NextResponse.json({ error: 'No assignment found' }, { status: 404 })
     }
 
@@ -154,6 +155,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       where: { id: id },
       data: { status: 'APPROVED' },
     })
+
+    await bumpCompletedJobs(assignment.workerId)
 
     // Create notifications
     await prisma.notification.create({

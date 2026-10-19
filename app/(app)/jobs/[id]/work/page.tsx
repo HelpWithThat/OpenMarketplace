@@ -42,7 +42,7 @@ export default async function WorkOnJobPage({ params }: { params: Promise<{ id: 
     },
   })
 
-  if (!assignment) {
+  if (!assignment || assignment.status === 'CANCELLED') {
     notFound()
   }
 

@@ -199,6 +199,14 @@ export function WorkerOfferCard({ offer, jobId, onUpdate }: { offer: any; jobId:
             </AlertDescription>
           </Alert>
         )}
+
+        {offer.status === 'DECLINED' && (
+          <Alert>
+            <AlertDescription>
+              This request is no longer active.
+            </AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   )

@@ -5,6 +5,7 @@
 import { prisma } from './prisma'
 import { calculateFees } from './fees'
 import { getPaymentProvider } from './payments'
+import { bumpCompletedJobs } from './assignment'
 
 export async function checkAutoApprove(assignmentId: string) {
   const assignment = await prisma.assignment.findUnique({
@@ -104,6 +105,8 @@ export async function checkAutoApprove(assignmentId: string) {
     where: { id: assignment.jobId },
     data: { status: 'APPROVED' },
   })
+
+  await bumpCompletedJobs(assignment.workerId)
 
   await prisma.notification.create({
     data: {

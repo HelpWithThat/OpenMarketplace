@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { bumpAcceptedJobs, ensureJobThread, removeCancelledAssignment } from '@/lib/assignment'
 
 export async function POST(
   req: NextRequest,
@@ -30,12 +31,17 @@ export async function POST(
       return NextResponse.json({ error: 'No counter-offer to accept' }, { status: 400 })
     }
 
+    if (offer.job.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'This job was cancelled' }, { status: 400 })
+    }
+
     const updatedOffer = await prisma.offer.update({
       where: { id },
       data: { status: 'APPROVED' },
     })
 
-    // Create assignment
+    await removeCancelledAssignment(offer.jobId)
+
     await prisma.assignment.create({
       data: {
         jobId: offer.jobId,
@@ -44,9 +50,16 @@ export async function POST(
       },
     })
 
+    await bumpAcceptedJobs(offer.workerId)
+
     await prisma.job.update({
       where: { id: offer.jobId },
       data: { status: 'ASSIGNED' },
+    })
+
+    await ensureJobThread({
+      jobId: offer.jobId,
+      participantIds: [offer.job.buyerId, offer.workerId],
     })
 
     return NextResponse.json({ offer: updatedOffer })

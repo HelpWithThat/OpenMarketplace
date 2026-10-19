@@ -6,11 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { RequestJobButton } from '@/components/request-job-button'
 import { JobOffersList } from '@/components/job-offers-list'
 import { WorkerOfferCard } from '@/components/worker-offer-card'
+import { CancelJobButton } from '@/components/cancel-job-button'
+import { ReliabilityStat } from '@/components/reliability-stat'
 import type { RoleFeeView } from '@/lib/fee-privacy'
 import { FeeCallout } from '@/components/fee-callout'
+import { decideCancel } from '@/lib/cancel'
 
 export function JobDetailClient({
   job,
@@ -29,8 +33,22 @@ export function JobDetailClient({
   const [refreshKey, setRefreshKey] = useState(0)
 
   const workerOffers = job.offers.filter((o: any) => o.workerId === userId)
-  const hasRequested = workerOffers.length > 0
   const workerOffer = workerOffers[0]
+  const hasActiveRequest = workerOffers.some((o: any) =>
+    ['PENDING', 'COUNTER_OFFER', 'ACCEPTED', 'APPROVED'].includes(o.status)
+  )
+  const hasRequested = hasActiveRequest
+  const cancelDecision = decideCancel({
+    userId,
+    job: { status: job.status, buyerId: job.buyerId || (isBuyer ? userId : '') },
+    assignment: job.assignment
+      ? {
+          workerId: job.assignment.workerId,
+          status: job.assignment.status,
+          checkInAt: job.assignment.checkInAt,
+        }
+      : null,
+  })
 
   const handleRefresh = () => {
     setRefreshKey(refreshKey + 1)
@@ -39,7 +57,7 @@ export function JobDetailClient({
 
   return (
     <div className="container max-w-4xl space-y-6 px-4 py-8">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="mb-2 text-3xl font-bold">{job.title}</h1>
           <p className="text-muted-foreground">
@@ -47,8 +65,31 @@ export function JobDetailClient({
             {new Date(job.publishedAt || job.createdAt).toLocaleDateString()}
           </p>
         </div>
-        <Badge>{job.status}</Badge>
+        <Badge className="w-fit text-sm">{job.status === 'CANCELLED' ? 'Cancelled' : job.status}</Badge>
       </div>
+
+      {job.status === 'CANCELLED' && (
+        <Alert>
+          <AlertDescription className="text-base">
+            This job was cancelled. It is closed and will not be offered to anyone else.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {cancelDecision.ok && (
+        <div className="space-y-2">
+          <p className="text-base text-muted-foreground">
+            {cancelDecision.role === 'worker'
+              ? "Can't make it? You can cancel and we'll offer this job to other people."
+              : "Don't need this anymore? You can cancel and close this job."}
+          </p>
+          <CancelJobButton
+            jobId={job.id}
+            role={cancelDecision.role}
+            applyWorkerPenalty={cancelDecision.applyWorkerPenalty}
+          />
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -150,7 +191,7 @@ export function JobDetailClient({
       )}
 
       {/* Worker view: request or view their offer */}
-      {!isBuyer && isWorker && job.status === 'OPEN' && !workerOffer && (
+      {!isBuyer && isWorker && job.status === 'OPEN' && !hasActiveRequest && (
         <Card>
           <CardHeader>
             <CardTitle>Request This Job</CardTitle>
@@ -190,9 +231,16 @@ export function JobDetailClient({
                 ? `Assigned to ${job.assignment.worker.workerProfile?.displayName || job.assignment.worker.name}`
                 : 'You are assigned to this job'}
             </CardDescription>
+            {isBuyer && job.assignment.worker.workerProfile && (
+              <ReliabilityStat
+                completedJobs={job.assignment.worker.workerProfile.completedJobs}
+                acceptedJobs={job.assignment.worker.workerProfile.acceptedJobs}
+                className="text-sm text-muted-foreground"
+              />
+            )}
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               {!isBuyer && (
                 <Button onClick={() => router.push(`/jobs/${job.id}/work`)}>
                   Start/Continue Work

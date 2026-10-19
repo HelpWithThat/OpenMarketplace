@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { config } from '@/lib/config'
+import { formatReliability } from '@/lib/reliability'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,6 +108,14 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.completedJobs}</div>
+            {user.isWorker && user.workerProfile && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {formatReliability({
+                  completedJobs: user.workerProfile.completedJobs,
+                  acceptedJobs: user.workerProfile.acceptedJobs,
+                })}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
