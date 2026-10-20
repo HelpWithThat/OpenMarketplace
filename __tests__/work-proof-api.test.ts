@@ -172,6 +172,10 @@ async function main() {
     const step = firstStep(job)
     const uploaded = await uploadWorkProof(workerCookie, job.id, step.id)
     assert(uploaded.res.ok, `upload failed: ${JSON.stringify(uploaded.body)}`)
+    assert(typeof uploaded.body.id === 'string' && uploaded.body.id, 'upload returns a database photo id')
+    assert(!uploaded.body.path, 'upload must not return a disk path')
+    assert(!uploaded.body.data, 'upload must not return photo bytes')
+    assert(uploaded.body.contentType === 'image/jpeg', `stored as jpeg, got ${uploaded.body.contentType}`)
 
     const submit = await jsonFetch(workerCookie, `/api/jobs/${job.id}/submit`, {
       method: 'POST',
@@ -192,15 +196,17 @@ async function main() {
     assert(result?.proofPhotos?.length === 1, 'buyer should see the proof photo')
     assert(result.proofPhotos[0].url.includes(`/api/jobs/${job.id}/tasks/${step.id}/photos/`), result.proofPhotos[0].url)
     assert(!JSON.stringify(result.proofPhotos).includes('work-proof/'), 'storage path must not leak')
+    assert(!result.proofPhotos.some((p: any) => p.data), 'photo bytes must not leak')
 
     const photoUrl = result.proofPhotos[0].url as string
     const buyerPhoto = await fetch(`${BASE_URL}${photoUrl}`, { headers: { cookie: buyerCookie } })
     assert(buyerPhoto.ok, `buyer should see work proof: ${buyerPhoto.status}`)
+    assert((buyerPhoto.headers.get('content-type') || '').includes('image/jpeg'), 'jpeg content type')
 
     const workerPhoto = await fetch(`${BASE_URL}${photoUrl}`, { headers: { cookie: workerCookie } })
     assert(workerPhoto.ok, `worker should see work proof: ${workerPhoto.status}`)
 
-    const publicLeak = await fetch(`${BASE_URL}/api/uploads/${uploaded.body.path}`)
+    const publicLeak = await fetch(`${BASE_URL}/api/uploads/work-proof/${job.id}/secret.jpg`)
     assert(publicLeak.status === 404, `public uploads must not serve work proof, got ${publicLeak.status}`)
 
     const signupEmail = `stranger-proof-${Date.now()}@demo.com`

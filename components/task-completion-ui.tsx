@@ -132,7 +132,8 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Could not save that photo')
         uploaded.push({
-          path: data.path,
+          id: data.id,
+          path: data.id,
           contentType: data.contentType,
           size: data.size,
           previewUrl: URL.createObjectURL(file),
@@ -212,9 +213,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
               {
                 ...result,
                 proofPhotos: (result.proofPhotos || []).map((photo: any) => ({
-                  path: photo.path,
-                  contentType: photo.contentType,
-                  size: photo.size,
+                  id: photo.id || photo.path,
                 })),
               },
             ])
@@ -225,11 +224,9 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
               type: expense.type,
               amount: Number(expense.amount),
               note: expense.note,
-              photos: expense.photos.map(({ path, kind, contentType, size }) => ({
-                path,
+              photos: expense.photos.map(({ id, kind }) => ({
+                id,
                 kind,
-                contentType,
-                size,
               })),
             })),
         }),

@@ -5,6 +5,7 @@ import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-priv
 import { assignmentForDisplay } from '@/lib/assignment'
 import { presentAssignmentExpenses } from '@/lib/expense-photos'
 import { presentAssignmentWorkProof } from '@/lib/work-proof'
+import { JOB_PHOTO_META_SELECT } from '@/lib/job-photos'
 
 export async function GET(
   _req: NextRequest,
@@ -41,13 +42,13 @@ export async function GET(
               include: { workerProfile: true },
             },
             expenses: {
-              include: { photos: true },
+              include: { photos: { select: JOB_PHOTO_META_SELECT } },
             },
             taskResults: {
               include: {
                 files: true,
                 step: true,
-                proofPhotos: true,
+                proofPhotos: { select: JOB_PHOTO_META_SELECT },
               },
             },
           },

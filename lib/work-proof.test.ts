@@ -7,7 +7,6 @@ import {
   workProofPhotoUrl,
 } from './work-proof'
 import { canAccessJobExpenses } from './expense-photos'
-import { isOwnedWorkProofPath } from './work-proof-storage'
 
 let passed = 0
 let failed = 0
@@ -66,11 +65,13 @@ test('only the job buyer and assigned worker can see work proof photos', () => {
   assert(!canAccessJobExpenses('stranger', job), 'stranger')
 })
 
-test('work proof paths stay scoped to the worker and job', () => {
-  assert(isOwnedWorkProofPath('work-proof/job-1/user-1/a.jpg', 'job-1', 'user-1'), 'owned')
-  assert(!isOwnedWorkProofPath('work-proof/job-1/user-2/a.jpg', 'job-1', 'user-1'), 'other user')
-  assert(!isOwnedWorkProofPath('work-proof/job-1/user-1/../secret.jpg', 'job-1', 'user-1'), 'traversal')
-  assert(!isOwnedWorkProofPath('expenses/job-1/user-1/a.jpg', 'job-1', 'user-1'), 'expense folder is not work proof')
+test('work proof client payloads never include stored bytes', () => {
+  const shown = presentWorkProofPhotos(
+    'job-1',
+    { stepId: 'step-1', proofPhotos: [{ id: 'photo-1', data: 'secret-bytes' } as any] },
+    true
+  )
+  assert(!JSON.stringify(shown).includes('secret-bytes'), 'bytes must not leak')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

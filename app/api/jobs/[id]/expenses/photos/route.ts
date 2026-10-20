@@ -1,14 +1,8 @@
-import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getStorageProvider } from '@/lib/storage'
 import { isExpensePhotoKind } from '@/lib/expense-photos'
-import {
-  expensePhotoStoragePrefix,
-  extensionForMime,
-  validateExpensePhotoBuffer,
-} from '@/lib/expense-photo-storage'
+import { createJobPhoto } from '@/lib/job-photos'
 
 export async function POST(
   req: NextRequest,
@@ -46,26 +40,17 @@ export async function POST(
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const check = validateExpensePhotoBuffer(buffer)
-    if (!check.ok) {
-      return NextResponse.json({ error: check.error }, { status: 400 })
-    }
-
-    const ext = extensionForMime(check.contentType)
-    if (!ext) {
-      return NextResponse.json({ error: 'Please use a photo (JPEG, PNG, WEBP, or GIF).' }, { status: 400 })
-    }
-
-    const relativePath = `${expensePhotoStoragePrefix(jobId, user.id)}${randomUUID()}${ext}`
-    const storage = getStorageProvider()
-    await storage.upload(buffer, relativePath, check.contentType)
-
-    return NextResponse.json({
-      path: relativePath,
+    const saved = await createJobPhoto({
+      jobId,
+      ownerId: user.id,
       kind: kindValue,
-      contentType: check.contentType,
-      size: buffer.length,
+      buffer,
     })
+    if (!saved.ok) {
+      return NextResponse.json({ error: saved.error }, { status: 400 })
+    }
+
+    return NextResponse.json(saved.photo)
   } catch (error) {
     console.error('Expense photo upload error:', error)
     return NextResponse.json({ error: 'Could not save that photo' }, { status: 500 })

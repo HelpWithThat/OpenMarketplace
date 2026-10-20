@@ -11,7 +11,7 @@ import { PhotoPicker } from '@/components/photo-picker'
 
 export type DraftExpensePhoto = {
   kind: ExpensePhotoKindName
-  path: string
+  id: string
   contentType: string
   size: number
   previewUrl: string
@@ -107,7 +107,7 @@ function ExpenseDraftCard({
         if (!res.ok) throw new Error(data.error || 'Could not save that photo')
         uploaded.push({
           kind,
-          path: data.path,
+          id: data.id,
           contentType: data.contentType,
           size: data.size,
           previewUrl: URL.createObjectURL(file),
@@ -180,19 +180,19 @@ function ExpenseDraftCard({
         title={fields.proofTitle}
         help={fields.proofHelp}
         required
-        photos={receipts}
+        photos={receipts.map((photo) => ({ path: photo.id, previewUrl: photo.previewUrl }))}
         uploading={uploading === 'RECEIPT'}
         onFiles={(files) => addPhotos('RECEIPT', files)}
-        onRemove={(path) => update({ photos: expense.photos.filter((photo) => photo.path !== path) })}
+        onRemove={(id) => update({ photos: expense.photos.filter((photo) => photo.id !== id) })}
       />
       {fields.showItems && (
         <PhotoPicker
           title={fields.itemsTitle}
           help={fields.itemsHelp}
-          photos={items}
+          photos={items.map((photo) => ({ path: photo.id, previewUrl: photo.previewUrl }))}
           uploading={uploading === 'ITEM'}
           onFiles={(files) => addPhotos('ITEM', files)}
-          onRemove={(path) => update({ photos: expense.photos.filter((photo) => photo.path !== path) })}
+          onRemove={(id) => update({ photos: expense.photos.filter((photo) => photo.id !== id) })}
         />
       )}
       {Number(expense.amount) > 0 && expense.photos.length === 0 && (

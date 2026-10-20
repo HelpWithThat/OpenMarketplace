@@ -57,6 +57,8 @@ model User {
   // Reports
   reportsCreated  Report[]  @relation("ReportCreator")
   reportsAbout    Report[]  @relation("ReportSubject")
+
+  jobPhotos       JobPhoto[]
   
   @@index([email])
   @@index([phone])
@@ -220,6 +222,7 @@ model Job {
   
   // Files
   attachments   JobAttachment[]
+  photos        JobPhoto[]
   
   // Task Template
   taskSections  TaskSection[]
@@ -529,7 +532,7 @@ model TaskResult {
   
   // Files
   files       TaskResultFile[]
-  proofPhotos TaskProofPhoto[]
+  proofPhotos JobPhoto[]
   
   // Signature
   signature   String?  // Base64 image
@@ -559,20 +562,6 @@ model TaskResultFile {
   @@index([resultId])
 }
 
-model TaskProofPhoto {
-  id          String   @id @default(cuid())
-  resultId    String
-  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
-
-  path        String
-  contentType String
-  size        Int
-
-  createdAt   DateTime @default(now())
-
-  @@index([resultId])
-}
-
 // ============================================================================
 // EXPENSES
 // ============================================================================
@@ -592,31 +581,42 @@ model ExpenseItem {
   
   feeExempt   Boolean  @default(true) // Always true per plan
 
-  photos      ExpensePhoto[]
+  photos      JobPhoto[]
   
   createdAt   DateTime @default(now())
   
   @@index([assignmentId])
 }
 
-model ExpensePhoto {
+model JobPhoto {
   id          String   @id @default(cuid())
-  expenseId   String
-  expense     ExpenseItem @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  kind        ExpensePhotoKind
-  path        String
+  kind        JobPhotoKind
+  data        Bytes
   contentType String
   size        Int
 
+  expenseId   String?
+  expense     ExpenseItem? @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  resultId    String?
+  result      TaskResult?  @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
   createdAt   DateTime @default(now())
 
+  @@index([jobId])
+  @@index([ownerId])
   @@index([expenseId])
+  @@index([resultId])
 }
 
-enum ExpensePhotoKind {
+enum JobPhotoKind {
   RECEIPT
   ITEM
+  WORK_PROOF
 }
 
 enum ExpenseType {

@@ -14,7 +14,7 @@ import {
   unapprovedExpensesNote,
 } from './expense-photos'
 import { collectForbiddenMoneyKeys } from './fee-privacy'
-import { detectImageMime, isOwnedExpensePhotoPath, validateExpensePhotoBuffer } from './expense-photo-storage'
+import { detectImageMime, validateExpensePhotoBuffer } from './expense-photo-storage'
 
 let passed = 0
 let failed = 0
@@ -150,13 +150,6 @@ test('only the job buyer and assigned worker can see expense photos', () => {
   assert(canAccessJobExpenses('buyer-1', job), 'buyer')
   assert(canAccessJobExpenses('worker-1', job), 'worker')
   assert(!canAccessJobExpenses('stranger', job), 'stranger')
-})
-
-test('expense photo paths stay scoped to the worker and job', () => {
-  assert(isOwnedExpensePhotoPath('expenses/job-1/user-1/a.jpg', 'job-1', 'user-1'), 'owned')
-  assert(!isOwnedExpensePhotoPath('expenses/job-1/user-2/a.jpg', 'job-1', 'user-1'), 'other user')
-  assert(!isOwnedExpensePhotoPath('expenses/job-1/user-1/../secret.jpg', 'job-1', 'user-1'), 'traversal')
-  assert(!isOwnedExpensePhotoPath('other/job-1/user-1/a.jpg', 'job-1', 'user-1'), 'wrong folder')
 })
 
 test('photo validation accepts a PNG and rejects non-images', () => {
