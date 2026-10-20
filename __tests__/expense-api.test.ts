@@ -2,6 +2,7 @@
  * Expense approve API tests. Requires a running server and demo users.
  */
 import { collectForbiddenMoneyKeys } from '../lib/fee-privacy'
+import { EXPENSE_PROOF_REQUIRED_MESSAGE } from '../lib/expenses'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:43891'
 const PNG_1x1 = Buffer.from(
@@ -116,17 +117,19 @@ async function main() {
   assert(materialsReceipt.res.ok, `materials receipt upload failed: ${JSON.stringify(materialsReceipt.body)}`)
 
   await test('parking and other expenses cannot be submitted without a proof photo', async () => {
-    const missingJob = await postJob(buyerCookie, `Missing proof ${Date.now()}`)
-    await assignWorker(buyerCookie, workerCookie, missingJob.id)
-    const { res, body } = await jsonFetch(workerCookie, `/api/jobs/${missingJob.id}/submit`, {
-      method: 'POST',
-      body: JSON.stringify({
-        results: {},
-        expenses: [{ type: 'PARKING', amount: 6, note: 'Street meter' }],
-      }),
-    })
-    assert(res.status === 400, `expected 400, got ${res.status} ${JSON.stringify(body)}`)
-    assert(/photo|receipt|meter/i.test(body.error || ''), body.error)
+    for (const type of ['PARKING', 'TRAVEL', 'TOLLS', 'MATERIALS', 'OTHER']) {
+      const missingJob = await postJob(buyerCookie, `Missing proof ${type} ${Date.now()}`)
+      await assignWorker(buyerCookie, workerCookie, missingJob.id)
+      const { res, body } = await jsonFetch(workerCookie, `/api/jobs/${missingJob.id}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({
+          results: {},
+          expenses: [{ type, amount: 6, note: 'No photo attached' }],
+        }),
+      })
+      assert(res.status === 400, `${type}: expected 400, got ${res.status} ${JSON.stringify(body)}`)
+      assert(body.error === EXPENSE_PROOF_REQUIRED_MESSAGE, `${type}: ${body.error}`)
+    }
   })
 
   const submitRes = await jsonFetch(workerCookie, `/api/jobs/${job.id}/submit`, {
