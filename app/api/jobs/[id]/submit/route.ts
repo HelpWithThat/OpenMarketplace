@@ -67,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Save expenses
-    for (const expense of expenses) {
+    for (const expense of expenses || []) {
       if (expense.amount > 0) {
         await prisma.expenseItem.create({
           data: {

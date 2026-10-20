@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port ${PORT:-43891}",
     "lint": "eslint",
-    "test": "npx tsx lib/fees.test.ts && npx tsx lib/cancel.test.ts && npx tsx __tests__/core-flows.test.ts && npx tsx __tests__/auth-login.test.ts && npx tsx __tests__/fee-privacy-api.test.ts && npx tsx __tests__/cancel-api.test.ts",
+    "test": "npx tsx lib/fees.test.ts && npx tsx lib/cancel.test.ts && npx tsx lib/expenses.test.ts && npx tsx __tests__/core-flows.test.ts && npx tsx __tests__/auth-login.test.ts && npx tsx __tests__/fee-privacy-api.test.ts && npx tsx __tests__/cancel-api.test.ts && npx tsx __tests__/expense-api.test.ts",
     "test:cancel": "npx tsx lib/cancel.test.ts && npx tsx __tests__/cancel-api.test.ts",
     "test:fee-privacy": "npx tsx __tests__/fee-privacy-api.test.ts",
     "test:fees": "npx tsx lib/fees.test.ts",

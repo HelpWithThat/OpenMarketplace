@@ -2,7 +2,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import { JobDetailClient } from '@/components/job-detail-client'
-import { feesForJob, moneyRoleForUser } from '@/lib/fee-privacy'
+import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-privacy'
 import { assignmentForDisplay } from '@/lib/assignment'
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -36,6 +36,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           worker: {
             include: { workerProfile: true },
           },
+          expenses: true,
         },
       },
     },
@@ -50,7 +51,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const fees = feesForJob(viewJob, role)
   return (
     <JobDetailClient
-      job={viewJob}
+      job={omitCrossSideMoney(viewJob, role)}
       userId={userId}
       isWorker={user.isWorker}
       isBuyer={job.buyerId === userId}

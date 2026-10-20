@@ -30,6 +30,11 @@ export function afterJobCompleted(profile: ReliabilityCounts): ReliabilityCounts
   }
 }
 
+export const RELIABILITY_SCORE_LABEL = 'Reliability Score'
+
+export const RELIABILITY_SCORE_HELPER =
+  'This counts jobs you accepted. Cancelling after you accept lowers this Reliability Score.'
+
 export function formatReliability(profile: { completedJobs: number; acceptedJobs: number }): string {
   const { completedJobs, acceptedJobs } = profile
   if (acceptedJobs <= 0) return 'No accepted jobs yet'

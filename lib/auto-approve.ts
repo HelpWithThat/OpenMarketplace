@@ -37,10 +37,10 @@ export async function checkAutoApprove(assignmentId: string) {
     },
   })
 
-  // Calculate final amounts
+  // Calculate final amounts (pending expenses were just approved above)
   const laborValue = assignment.agreedPay
   const expensesTotal = assignment.expenses
-    .filter(e => e.status === 'APPROVED')
+    .filter((e) => e.status !== 'REJECTED')
     .reduce((sum, e) => sum + e.amount, 0)
   const penaltiesTotal = assignment.penalties.reduce((sum, p) => sum + p.amount, 0)
 

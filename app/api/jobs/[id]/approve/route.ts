@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const userId = user.id
-    const { approvedExpenses, rejectedExpenses, note } = await req.json()
+    const { note } = await req.json()
 
     const job = await prisma.job.findUnique({
       where: { id },
@@ -40,38 +40,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const assignment = job.assignment
 
-    // Update expense statuses
-    if (approvedExpenses) {
-      for (const expenseId of approvedExpenses) {
-        await prisma.expenseItem.update({
-          where: { id: expenseId },
-          data: {
-            status: 'APPROVED',
-            approvedAt: new Date(),
-          },
-        })
-      }
+    const pendingExpenses = assignment.expenses.filter((item) => item.status === 'PENDING')
+    if (pendingExpenses.length > 0) {
+      return NextResponse.json(
+        { error: 'Please approve or decline each expense before you pay' },
+        { status: 400 }
+      )
     }
 
-    if (rejectedExpenses) {
-      for (const expenseId of rejectedExpenses) {
-        await prisma.expenseItem.update({
-          where: { id: expenseId },
-          data: { status: 'REJECTED' },
-        })
-      }
-    }
-
-    // Calculate final amounts
+    // Calculate final amounts from expenses already approved on the job
     const laborValue = assignment.agreedPay
-    const approvedExpensesTotal = await prisma.expenseItem.aggregate({
-      where: {
-        assignmentId: assignment.id,
-        status: 'APPROVED',
-      },
-      _sum: { amount: true },
-    })
-    const expensesTotal = approvedExpensesTotal._sum.amount || 0
+    const approvedExpensesTotal = assignment.expenses
+      .filter((item) => item.status === 'APPROVED')
+      .reduce((sum, item) => sum + item.amount, 0)
+    const expensesTotal = approvedExpensesTotal
 
     const penaltiesTotal = assignment.penalties.reduce((sum, p) => sum + p.amount, 0)
 

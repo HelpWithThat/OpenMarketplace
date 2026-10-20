@@ -10,6 +10,8 @@ import {
   afterJobCompleted,
   formatReliability,
   reliabilityFromCounts,
+  RELIABILITY_SCORE_HELPER,
+  RELIABILITY_SCORE_LABEL,
 } from './reliability'
 import { collectForbiddenMoneyKeys } from './fee-privacy'
 
@@ -157,6 +159,9 @@ test('formatReliability is plain language', () => {
     'expected finished 18 of 20'
   )
   assert(formatReliability({ completedJobs: 0, acceptedJobs: 0 }) === 'No accepted jobs yet', 'empty state')
+  assert(RELIABILITY_SCORE_LABEL === 'Reliability Score', 'label is Reliability Score')
+  assert(RELIABILITY_SCORE_HELPER.includes('Reliability Score'), 'helper names Reliability Score')
+  assert(!RELIABILITY_SCORE_HELPER.includes('this number'), 'helper should not say this number')
 })
 
 test('worker cancel does not increment completedJobs (unfinished accepted job)', () => {

@@ -108,7 +108,7 @@ export function feesForJob(
   const expenses =
     expensesTotal ??
     job.assignment?.expenses
-      ?.filter((e) => !e.status || e.status === 'APPROVED' || e.status === 'PENDING')
+      ?.filter((e) => e.status === 'APPROVED')
       .reduce((sum, e) => sum + e.amount, 0) ??
     0
   return feeViewForRole(calculateFees(labor, expenses, feeSettingsFromEnv()), role)

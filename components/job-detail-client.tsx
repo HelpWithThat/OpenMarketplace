@@ -12,6 +12,7 @@ import { JobOffersList } from '@/components/job-offers-list'
 import { WorkerOfferCard } from '@/components/worker-offer-card'
 import { CancelJobButton } from '@/components/cancel-job-button'
 import { ReliabilityStat } from '@/components/reliability-stat'
+import { ExpenseList } from '@/components/expense-list'
 import type { RoleFeeView } from '@/lib/fee-privacy'
 import { FeeCallout } from '@/components/fee-callout'
 import { decideCancel } from '@/lib/cancel'
@@ -241,9 +242,14 @@ export function JobDetailClient({
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-4">
-              {!isBuyer && (
+              {!isBuyer && job.status !== 'SUBMITTED' && job.status !== 'APPROVED' && job.status !== 'PAID' && (
                 <Button onClick={() => router.push(`/jobs/${job.id}/work`)}>
                   Start/Continue Work
+                </Button>
+              )}
+              {isBuyer && job.status === 'SUBMITTED' && (
+                <Button size="lg" className="h-12 text-base" onClick={() => router.push(`/jobs/${job.id}/approve`)}>
+                  Review work and pay
                 </Button>
               )}
               <Button
@@ -255,6 +261,18 @@ export function JobDetailClient({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {job.assignment?.expenses?.length > 0 && (
+        <ExpenseList
+          jobId={job.id}
+          expenses={job.assignment.expenses}
+          isBuyer={isBuyer}
+          allowReview={
+            isBuyer && !['APPROVED', 'PAID', 'CANCELLED', 'DISPUTED'].includes(job.status)
+          }
+          onUpdate={handleRefresh}
+        />
       )}
     </div>
   )

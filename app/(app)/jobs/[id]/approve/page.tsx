@@ -7,10 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { BuyerFeeView } from '@/lib/fee-privacy'
+import { ExpenseList } from '@/components/expense-list'
 
 export default function ApproveJobPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -19,7 +18,6 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState('')
   const [job, setJob] = useState<any>(null)
   const [jobId, setJobId] = useState<string>('')
-  const [approvedExpenses, setApprovedExpenses] = useState<string[]>([])
   const [note, setNote] = useState('')
 
   useEffect(() => {
@@ -35,10 +33,6 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
       const res = await fetch(`/api/jobs/${jobId}`)
       const data = await res.json()
       setJob(data.job)
-      // Auto-approve all expenses by default
-      if (data.job.assignment?.expenses) {
-        setApprovedExpenses(data.job.assignment.expenses.map((e: any) => e.id))
-      }
     } catch (err) {
       setError('Failed to load job')
     } finally {
@@ -55,7 +49,6 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          approvedExpenses,
           note,
         }),
       })
@@ -84,9 +77,11 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
   const fees = job.fees as BuyerFeeView | undefined
   const laborValue = fees?.laborValue ?? job.assignment.agreedPay ?? job.fixedPrice ?? 0
   const yourFee = fees?.yourFee ?? 0
-  const totalExpenses = job.assignment.expenses
-    ?.filter((e: any) => approvedExpenses.includes(e.id))
-    .reduce((sum: number, e: any) => sum + e.amount, 0) || 0
+  const expenses = job.assignment.expenses || []
+  const pendingExpenses = expenses.filter((e: any) => e.status === 'PENDING')
+  const totalExpenses = expenses
+    .filter((e: any) => e.status === 'APPROVED')
+    .reduce((sum: number, e: any) => sum + e.amount, 0)
   const youPay = laborValue + yourFee + totalExpenses
 
   return (
@@ -154,48 +149,21 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
         </CardContent>
       </Card>
 
-      {job.assignment.expenses?.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Expenses</CardTitle>
-            <CardDescription>Review and approve expenses</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {job.assignment.expenses.map((expense: any) => (
-              <div key={expense.id} className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3 flex-1">
-                  <Checkbox
-                    id={expense.id}
-                    checked={approvedExpenses.includes(expense.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setApprovedExpenses([...approvedExpenses, expense.id])
-                      } else {
-                        setApprovedExpenses(approvedExpenses.filter(id => id !== expense.id))
-                      }
-                    }}
-                  />
-                  <Label htmlFor={expense.id} className="flex-1 cursor-pointer">
-                    <div>
-                      <p className="text-sm font-medium">{expense.description}</p>
-                      <p className="text-sm text-muted-foreground">${expense.amount.toFixed(2)}</p>
-                    </div>
-                  </Label>
-                </div>
-                {expense.receiptUrl && (
-                  <a
-                    href={expense.receiptUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary underline"
-                  >
-                    Receipt
-                  </a>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      {expenses.length > 0 && (
+        <ExpenseList
+          jobId={jobId}
+          expenses={expenses}
+          isBuyer
+          allowReview
+          onUpdate={loadJob}
+        />
+      )}
+      {pendingExpenses.length > 0 && (
+        <Alert>
+          <AlertDescription className="text-base">
+            Please approve or decline each expense before you pay.
+          </AlertDescription>
+        </Alert>
       )}
 
       <Card>
@@ -241,7 +209,12 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
       </Card>
 
       <div className="flex gap-4">
-        <Button onClick={handleApprove} disabled={submitting} className="flex-1">
+        <Button
+          onClick={handleApprove}
+          disabled={submitting || pendingExpenses.length > 0}
+          className="h-12 flex-1 text-base"
+          size="lg"
+        >
           {submitting ? 'Approving...' : 'Approve & Pay'}
         </Button>
         <Button variant="outline" onClick={() => router.back()}>

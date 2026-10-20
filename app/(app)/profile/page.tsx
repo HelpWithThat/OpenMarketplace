@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Slider } from '@/components/ui/slider'
-import { formatReliability } from '@/lib/reliability'
+import { formatReliability, RELIABILITY_SCORE_HELPER, RELIABILITY_SCORE_LABEL } from '@/lib/reliability'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -234,7 +234,7 @@ export default function ProfilePage() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Reliability</CardTitle>
+              <CardTitle>{RELIABILITY_SCORE_LABEL}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-lg font-medium">
@@ -244,7 +244,7 @@ export default function ProfilePage() {
                 })}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                This counts jobs you accepted. Cancelling after you accept lowers this number.
+                {RELIABILITY_SCORE_HELPER}
               </p>
             </CardContent>
           </Card>
