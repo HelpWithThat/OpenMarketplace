@@ -79,7 +79,7 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
   const fees = job.fees as BuyerFeeView | undefined
   const laborValue = fees?.laborValue ?? job.assignment.agreedPay ?? job.fixedPrice ?? 0
   const yourFee = fees?.yourFee ?? 0
-  const expenses = job.assignment.expenses || []
+  const expenses: any[] = job.assignment.expenses || []
   const pending = pendingExpenses(expenses)
   const reminder = pendingPayReminderCopy(expenses)
   const unapprovedNote = unapprovedExpensesNote(expenses)
