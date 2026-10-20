@@ -6,6 +6,7 @@ import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-priv
 import { assignmentForDisplay } from '@/lib/assignment'
 import { presentAssignmentExpenses } from '@/lib/expense-photos'
 import { presentAssignmentWorkProof } from '@/lib/work-proof'
+import { JOB_PHOTO_META_SELECT } from '@/lib/job-photos'
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,13 +40,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             include: { workerProfile: true },
           },
           expenses: {
-            include: { photos: true },
+            include: { photos: { select: JOB_PHOTO_META_SELECT } },
           },
           taskResults: {
             include: {
               files: true,
               step: true,
-              proofPhotos: true,
+              proofPhotos: { select: JOB_PHOTO_META_SELECT },
             },
           },
         },

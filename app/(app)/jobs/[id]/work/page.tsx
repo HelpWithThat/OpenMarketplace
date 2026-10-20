@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import { TaskCompletionUI } from '@/components/task-completion-ui'
 import { presentAssignmentWorkProof } from '@/lib/work-proof'
+import { JOB_PHOTO_META_SELECT } from '@/lib/job-photos'
 
 export default async function WorkOnJobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -37,11 +38,11 @@ export default async function WorkOnJobPage({ params }: { params: Promise<{ id: 
       taskResults: {
         include: {
           files: true,
-          proofPhotos: true,
+          proofPhotos: { select: JOB_PHOTO_META_SELECT },
         },
       },
       expenses: {
-        include: { photos: true },
+        include: { photos: { select: JOB_PHOTO_META_SELECT } },
       },
     },
   })

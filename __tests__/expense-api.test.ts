@@ -111,6 +111,10 @@ async function main() {
 
   const receipt = await uploadPhoto(workerCookie, job.id, 'RECEIPT')
   assert(receipt.res.ok, `receipt upload failed: ${JSON.stringify(receipt.body)}`)
+  assert(typeof receipt.body.id === 'string' && receipt.body.id, 'upload returns a database photo id')
+  assert(!receipt.body.path, 'upload must not return a disk path')
+  assert(!receipt.body.data, 'upload must not return photo bytes')
+  assert(receipt.body.contentType === 'image/jpeg', `stored as jpeg, got ${receipt.body.contentType}`)
   const itemPhoto = await uploadPhoto(workerCookie, job.id, 'ITEM')
   assert(itemPhoto.res.ok, `item upload failed: ${JSON.stringify(itemPhoto.body)}`)
   const materialsReceipt = await uploadPhoto(workerCookie, job.id, 'RECEIPT')
@@ -162,6 +166,7 @@ async function main() {
   assert(parking && materials, 'missing submitted expenses')
   assert(parking.photos?.length === 2, `expected 2 photos, got ${parking.photos?.length}`)
   assert(!parking.photos.some((p: any) => p.path), 'photo path must not leak to the client')
+  assert(!parking.photos.some((p: any) => p.data), 'photo bytes must not leak to the client')
   const photoUrl = parking.photos[0].url as string
   assert(photoUrl.includes(`/api/jobs/${job.id}/expenses/${parking.id}/photos/`), 'gated photo url')
 
@@ -197,12 +202,12 @@ async function main() {
   await test('buyer and worker can view expense photos; others cannot', async () => {
     const buyerPhoto = await fetch(`${BASE_URL}${photoUrl}`, { headers: { cookie: buyerCookie } })
     assert(buyerPhoto.ok, `buyer should see expense photo: ${buyerPhoto.status}`)
-    assert((buyerPhoto.headers.get('content-type') || '').includes('image/png'), 'png content type')
+    assert((buyerPhoto.headers.get('content-type') || '').includes('image/jpeg'), 'jpeg content type')
 
     const workerPhoto = await fetch(`${BASE_URL}${photoUrl}`, { headers: { cookie: workerCookie } })
     assert(workerPhoto.ok, `worker should see expense photo: ${workerPhoto.status}`)
 
-    const publicLeak = await fetch(`${BASE_URL}/api/uploads/${receipt.body.path}`)
+    const publicLeak = await fetch(`${BASE_URL}/api/uploads/expenses/${job.id}/secret.jpg`)
     assert(publicLeak.status === 404, `public uploads must not serve expense photos, got ${publicLeak.status}`)
 
     const signupEmail = `stranger-${Date.now()}@demo.com`
