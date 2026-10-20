@@ -13,6 +13,7 @@ import { WorkerOfferCard } from '@/components/worker-offer-card'
 import { CancelJobButton } from '@/components/cancel-job-button'
 import { ReliabilityStat } from '@/components/reliability-stat'
 import { ExpenseList } from '@/components/expense-list'
+import { WorkProofGallery } from '@/components/work-proof-gallery'
 import type { RoleFeeView } from '@/lib/fee-privacy'
 import { FeeCallout } from '@/components/fee-callout'
 import { decideCancel } from '@/lib/cancel'
@@ -177,13 +178,22 @@ export function JobDetailClient({
             {job.taskSections.map((section: any) => (
               <div key={section.id} className="space-y-2">
                 <h3 className="font-medium">{section.name}</h3>
-                <ul className="ml-4 space-y-1">
-                  {section.steps.map((step: any) => (
-                    <li key={step.id} className="text-sm text-muted-foreground">
-                      • {step.title}
-                      {step.required && <span className="ml-1 text-destructive">*</span>}
-                    </li>
-                  ))}
+                <ul className="space-y-3">
+                  {section.steps.map((step: any) => {
+                    const result = (job.assignment?.taskResults || []).find((item: any) => item.stepId === step.id)
+                    return (
+                      <li key={step.id} className="space-y-2 text-base">
+                        <p>
+                          {step.title}
+                          {step.required && <span className="ml-1 text-destructive">*</span>}
+                        </p>
+                        {step.photoProofRequired && (
+                          <p className="text-base text-muted-foreground">A photo is required when this task is done.</p>
+                        )}
+                        <WorkProofGallery photos={result?.proofPhotos} />
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             ))}

@@ -346,6 +346,7 @@ model TaskStep {
   title       String
   instructions String?
   required    Boolean  @default(false)
+  photoProofRequired Boolean @default(false)
   
   // Settings (JSON for flexibility)
   settings    Json?    // {minPhotos: 2, maxPhotos: 5, choices: ["A", "B"], ...}
@@ -528,6 +529,7 @@ model TaskResult {
   
   // Files
   files       TaskResultFile[]
+  proofPhotos TaskProofPhoto[]
   
   // Signature
   signature   String?  // Base64 image
@@ -554,6 +556,20 @@ model TaskResultFile {
   fileType    String
   uploadedAt  DateTime @default(now())
   
+  @@index([resultId])
+}
+
+model TaskProofPhoto {
+  id          String   @id @default(cuid())
+  resultId    String
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  path        String
+  contentType String
+  size        Int
+
+  createdAt   DateTime @default(now())
+
   @@index([resultId])
 }
 

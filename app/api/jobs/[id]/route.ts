@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-privacy'
 import { assignmentForDisplay } from '@/lib/assignment'
 import { presentAssignmentExpenses } from '@/lib/expense-photos'
+import { presentAssignmentWorkProof } from '@/lib/work-proof'
 
 export async function GET(
   _req: NextRequest,
@@ -23,7 +24,7 @@ export async function GET(
           include: { buyerProfile: true },
         },
         taskSections: {
-          include: { steps: true },
+          include: { steps: { orderBy: { order: 'asc' } } },
           orderBy: { order: 'asc' },
         },
         offers: {
@@ -46,6 +47,7 @@ export async function GET(
               include: {
                 files: true,
                 step: true,
+                proofPhotos: true,
               },
             },
           },
@@ -62,7 +64,12 @@ export async function GET(
     const fees = feesForJob(viewJob, role)
     const safeJob = {
       ...viewJob,
-      assignment: presentAssignmentExpenses(viewJob.id, viewJob.assignment, user.id, viewJob.buyerId),
+      assignment: presentAssignmentWorkProof(
+        viewJob.id,
+        presentAssignmentExpenses(viewJob.id, viewJob.assignment, user.id, viewJob.buyerId),
+        user.id,
+        viewJob.buyerId
+      ),
       fees,
     }
     return NextResponse.json(

@@ -25,7 +25,7 @@ export async function GET(
   if (!segments?.length) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  if (segments[0] === 'expenses') {
+  if (segments[0] === 'expenses' || segments[0] === 'work-proof') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 

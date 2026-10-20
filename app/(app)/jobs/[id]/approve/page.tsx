@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { BuyerFeeView } from '@/lib/fee-privacy'
 import { ExpenseList } from '@/components/expense-list'
 import { pendingExpenses, pendingPayReminderCopy, unapprovedExpensesNote } from '@/lib/expense-photos'
+import { WorkProofGallery } from '@/components/work-proof-gallery'
 
 export default function ApproveJobPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -137,8 +138,8 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
         <CardContent className="space-y-4">
           {job.assignment.taskResults?.map((result: any) => (
             <div key={result.id} className="space-y-2">
-              <p className="text-sm font-medium">{result.step.title}</p>
-              {result.textValue && <p className="text-sm text-muted-foreground">{result.textValue}</p>}
+              <p className="text-base font-medium">{result.step.title}</p>
+              {result.textValue && <p className="text-base text-muted-foreground">{result.textValue}</p>}
               {result.files?.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {result.files.map((file: any) => (
@@ -157,6 +158,7 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
                   ))}
                 </div>
               )}
+              <WorkProofGallery photos={result.proofPhotos} />
             </div>
           ))}
         </CardContent>
@@ -218,6 +220,25 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
           />
         </CardContent>
       </Card>
+
+      {(job.assignment.taskResults || []).some((result: any) => result.proofPhotos?.length) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Proof of work</CardTitle>
+            <CardDescription>Look at these photos before you pay.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(job.assignment.taskResults || [])
+              .filter((result: any) => result.proofPhotos?.length)
+              .map((result: any) => (
+                <div key={result.id} className="space-y-2">
+                  <p className="text-base font-medium">{result.step?.title}</p>
+                  <WorkProofGallery photos={result.proofPhotos} />
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+      )}
 
       {reminder && pending.length > 0 && (
         <div className="space-y-3 rounded-xl border-2 border-primary p-1">

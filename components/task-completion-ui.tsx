@@ -12,7 +12,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { ExpenseComposer, emptyDraftExpense, type DraftExpense } from '@/components/expense-composer'
+import { PhotoPicker, type PhotoPickerItem } from '@/components/photo-picker'
 import { EXPENSE_PROOF_REQUIRED_MESSAGE, expenseHasProof } from '@/lib/expenses'
+import {
+  WORK_PROOF_HELP,
+  WORK_PROOF_PHOTO_MAX,
+  WORK_PROOF_REQUIRED_MESSAGE,
+  workProofHasPhotos,
+} from '@/lib/work-proof'
 
 export function TaskCompletionUI({ assignment }: { assignment: any }) {
   const router = useRouter()
@@ -28,6 +35,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({})
+  const [uploadingProof, setUploadingProof] = useState<Record<string, boolean>>({})
 
   const job = assignment.job
   const existingResults = assignment.taskResults.reduce((acc: any, result: any) => {
@@ -36,7 +44,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
   }, {})
 
   const handleCheckbox = (stepId: string, checked: boolean) => {
-    setResults(prev => ({ ...prev, [stepId]: { completed: checked } }))
+    setResults(prev => ({ ...prev, [stepId]: { ...prev[stepId], completed: checked } }))
   }
 
   const handleCheckIn = async (stepId: string) => {
@@ -46,6 +54,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
       setResults(prev => ({
         ...prev,
         [stepId]: {
+          ...prev[stepId],
           dateValue: now,
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -54,7 +63,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
     } catch {
       setResults(prev => ({
         ...prev,
-        [stepId]: { dateValue: now },
+        [stepId]: { ...prev[stepId], dateValue: now },
       }))
     }
   }
@@ -77,6 +86,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
       setResults(prev => ({
         ...prev,
         [stepId]: {
+          ...prev[stepId],
           files: [...(prev[stepId]?.files || []), ...uploadedFiles],
         },
       }))
@@ -90,8 +100,56 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
   const handleSignature = (stepId: string, signature: string, signerName: string) => {
     setResults(prev => ({
       ...prev,
-      [stepId]: { signature, signerName },
+      [stepId]: { ...prev[stepId], signature, signerName },
     }))
+  }
+
+  const proofPhotosFor = (stepId: string): PhotoPickerItem[] => {
+    return (results[stepId]?.proofPhotos || existingResults[stepId]?.proofPhotos || []).map((photo: any) => ({
+      path: photo.path || photo.id,
+      previewUrl: photo.previewUrl || photo.url,
+    }))
+  }
+
+  const addProofPhotos = async (stepId: string, files: FileList | null) => {
+    if (!files?.length) return
+    const existing = proofPhotosFor(stepId)
+    if (existing.length + files.length > WORK_PROOF_PHOTO_MAX) {
+      setError(`You can add up to ${WORK_PROOF_PHOTO_MAX} photos here.`)
+      return
+    }
+    setError('')
+    setUploadingProof((prev) => ({ ...prev, [stepId]: true }))
+    try {
+      const uploaded: any[] = []
+      for (const file of Array.from(files)) {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch(`/api/jobs/${job.id}/tasks/${stepId}/photos`, {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Could not save that photo')
+        uploaded.push({
+          path: data.path,
+          contentType: data.contentType,
+          size: data.size,
+          previewUrl: URL.createObjectURL(file),
+        })
+      }
+      setResults((prev) => ({
+        ...prev,
+        [stepId]: {
+          ...(prev[stepId] || existingResults[stepId] || {}),
+          proofPhotos: [...proofPhotosFor(stepId), ...uploaded],
+        },
+      }))
+    } catch (err: any) {
+      setError(err.message || 'Could not save that photo')
+    } finally {
+      setUploadingProof((prev) => ({ ...prev, [stepId]: false }))
+    }
   }
 
   const addExpense = () => {
@@ -114,6 +172,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
           if (step.type === 'SIGNATURE' && !result.signature) return false
           if (step.type === 'FILE_UPLOAD' && (!result.files || result.files.length === 0)) return false
         }
+        if (step.photoProofRequired && !workProofHasPhotos(proofPhotosFor(step.id))) return false
       }
     }
     return true
@@ -122,6 +181,13 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
   const handleSubmit = async () => {
     if (!canSubmit()) {
       setError('Please complete all required tasks')
+      return
+    }
+    const missingWorkProof = job.taskSections.some((section: any) =>
+      section.steps.some((step: any) => step.photoProofRequired && !workProofHasPhotos(proofPhotosFor(step.id)))
+    )
+    if (missingWorkProof) {
+      setError(WORK_PROOF_REQUIRED_MESSAGE)
       return
     }
     const missingProof = expenses.some(
@@ -140,7 +206,19 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          results,
+          results: Object.fromEntries(
+            Object.entries(results).map(([stepId, result]: [string, any]) => [
+              stepId,
+              {
+                ...result,
+                proofPhotos: (result.proofPhotos || []).map((photo: any) => ({
+                  path: photo.path,
+                  contentType: photo.contentType,
+                  size: photo.size,
+                })),
+              },
+            ])
+          ),
           expenses: expenses
             .filter((expense) => Number(expense.amount) > 0)
             .map((expense) => ({
@@ -293,7 +371,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                       value={result?.textValue || ''}
                       onChange={(e) => setResults(prev => ({
                         ...prev,
-                        [step.id]: { textValue: e.target.value },
+                        [step.id]: { ...prev[step.id], textValue: e.target.value },
                       }))}
                       rows={3}
                     />
@@ -305,7 +383,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                       value={result?.numberValue || ''}
                       onChange={(e) => setResults(prev => ({
                         ...prev,
-                        [step.id]: { numberValue: parseFloat(e.target.value) },
+                        [step.id]: { ...prev[step.id], numberValue: parseFloat(e.target.value) },
                       }))}
                     />
                   )}
@@ -316,7 +394,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                       value={result?.textValue || ''}
                       onChange={(e) => setResults(prev => ({
                         ...prev,
-                        [step.id]: { textValue: e.target.value },
+                        [step.id]: { ...prev[step.id], textValue: e.target.value },
                       }))}
                     />
                   )}
@@ -327,7 +405,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                       value={result?.textValue || ''}
                       onChange={(e) => setResults(prev => ({
                         ...prev,
-                        [step.id]: { textValue: e.target.value },
+                        [step.id]: { ...prev[step.id], textValue: e.target.value },
                       }))}
                     />
                   )}
@@ -337,7 +415,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                       value={result?.boolValue?.toString() || ''}
                       onValueChange={(value) => setResults(prev => ({
                         ...prev,
-                        [step.id]: { boolValue: value === 'true' },
+                        [step.id]: { ...prev[step.id], boolValue: value === 'true' },
                       }))}
                     >
                       <div className="flex items-center space-x-2">
@@ -356,7 +434,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                       value={result?.textValue || ''}
                       onValueChange={(value) => setResults(prev => ({
                         ...prev,
-                        [step.id]: { textValue: value },
+                        [step.id]: { ...prev[step.id], textValue: value },
                       }))}
                     >
                       {step.settings.choices.map((choice: string, i: number) => (
@@ -375,7 +453,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                         value={result?.textValue || ''}
                         onChange={(e) => setResults(prev => ({
                           ...prev,
-                          [step.id]: { textValue: e.target.value },
+                          [step.id]: { ...prev[step.id], textValue: e.target.value },
                         }))}
                         rows={2}
                       />
@@ -434,6 +512,31 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
                       )}
                     </div>
                   )}
+
+                  <div data-testid={`work-proof-${step.id}`}>
+                    <PhotoPicker
+                      title="Proof of work"
+                      help={WORK_PROOF_HELP}
+                      required={step.photoProofRequired ? true : 'optional'}
+                      photos={proofPhotosFor(step.id)}
+                      uploading={!!uploadingProof[step.id]}
+                      onFiles={(files) => addProofPhotos(step.id, files)}
+                      onRemove={(path) =>
+                        setResults((prev) => ({
+                          ...prev,
+                          [step.id]: {
+                            ...prev[step.id],
+                            proofPhotos: proofPhotosFor(step.id).filter((photo) => photo.path !== path),
+                          },
+                        }))
+                      }
+                    />
+                    {step.photoProofRequired && !workProofHasPhotos(proofPhotosFor(step.id)) && (
+                      <Alert className="mt-3">
+                        <AlertDescription className="text-base">{WORK_PROOF_REQUIRED_MESSAGE}</AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
                 </div>
               )
             })}
