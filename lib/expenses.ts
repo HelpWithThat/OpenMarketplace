@@ -16,6 +16,49 @@ export function formatExpenseLabel(expense: { type: string; note?: string | null
   return note ? `${type}: ${note}` : type
 }
 
+export const EXPENSE_PROOF_REQUIRED_MESSAGE =
+  'Please add a photo of the receipt, parking receipt, or meter/app screenshot for each expense.'
+
+export function expenseHasProof(photos: unknown): boolean {
+  return Array.isArray(photos) && photos.length > 0
+}
+
+export function expenseProofFields(type: string) {
+  if (type === 'PARKING') {
+    return {
+      proofTitle: 'Parking proof photos',
+      proofHelp:
+        'Add a photo of the parking receipt, the meter, or the parking app. Take a photo or choose from your gallery. You can add more than one.',
+      showItems: false,
+      itemsTitle: '',
+      itemsHelp: '',
+      galleryProofTitle: 'Parking proof',
+      galleryProofLabel: 'Parking proof',
+    }
+  }
+  if (type === 'TRAVEL' || type === 'TOLLS') {
+    return {
+      proofTitle: 'Proof photos',
+      proofHelp:
+        'Add a photo of the receipt, ticket, or app. Take a photo or choose from your gallery. You can add more than one.',
+      showItems: false,
+      itemsTitle: '',
+      itemsHelp: '',
+      galleryProofTitle: 'Proof',
+      galleryProofLabel: 'Proof',
+    }
+  }
+  return {
+    proofTitle: 'Receipt photos',
+    proofHelp: 'Take a picture of the receipt, or choose one from your gallery. You can add more than one.',
+    showItems: true,
+    itemsTitle: 'Photos of the items',
+    itemsHelp: 'Take pictures of what you bought, or choose them from your gallery.',
+    galleryProofTitle: 'Receipt',
+    galleryProofLabel: 'Receipt',
+  }
+}
+
 const LOCKED_JOB_STATUSES = ['APPROVED', 'PAID', 'CANCELLED', 'DISPUTED'] as const
 
 export function decideExpenseReview(opts: {

@@ -122,7 +122,11 @@ function ExpenseRow({
         <Badge>{expenseStatusLabel(expense.status)}</Badge>
       </div>
 
-      <ExpensePhotoGallery photos={expense.photos} receiptUrl={expense.receiptUrl} />
+      <ExpensePhotoGallery
+        photos={expense.photos}
+        receiptUrl={expense.receiptUrl}
+        expenseType={expense.type}
+      />
 
       {canReview && !confirm && (
         <Button

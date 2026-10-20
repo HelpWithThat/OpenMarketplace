@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { EXPENSE_PHOTO_MAX_PER_KIND, isExpensePhotoKind } from '@/lib/expense-photos'
 import { readOwnedExpensePhotoFile } from '@/lib/expense-photo-storage'
+import { EXPENSE_PROOF_REQUIRED_MESSAGE, expenseHasProof } from '@/lib/expenses'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -100,6 +101,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           { error: `Please attach up to ${EXPENSE_PHOTO_MAX_PER_KIND} photos of each kind` },
           { status: 400 }
         )
+      }
+      if (!expenseHasProof(photos)) {
+        return NextResponse.json({ error: EXPENSE_PROOF_REQUIRED_MESSAGE }, { status: 400 })
       }
 
       await prisma.expenseItem.create({

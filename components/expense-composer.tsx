@@ -4,7 +4,8 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { EXPENSE_TYPE_LABELS } from '@/lib/expenses'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { EXPENSE_PROOF_REQUIRED_MESSAGE, EXPENSE_TYPE_LABELS, expenseProofFields } from '@/lib/expenses'
 import { EXPENSE_PHOTO_MAX_PER_KIND, type ExpensePhotoKindName } from '@/lib/expense-photos'
 
 export type DraftExpensePhoto = {
@@ -119,8 +120,11 @@ function ExpenseDraftCard({
     }
   }
 
-  const receipts = expense.photos.filter((photo) => photo.kind === 'RECEIPT')
-  const items = expense.photos.filter((photo) => photo.kind === 'ITEM')
+  const fields = expenseProofFields(expense.type)
+  const receipts = fields.showItems
+    ? expense.photos.filter((photo) => photo.kind === 'RECEIPT')
+    : expense.photos
+  const items = fields.showItems ? expense.photos.filter((photo) => photo.kind === 'ITEM') : []
 
   return (
     <div className="space-y-4 rounded-xl border border-border p-4">
@@ -172,21 +176,29 @@ function ExpenseDraftCard({
       </div>
 
       <PhotoPicker
-        title="Receipt photos"
-        help="Take a picture of the receipt, or choose one from your gallery. You can add more than one."
+        title={fields.proofTitle}
+        help={fields.proofHelp}
+        required
         photos={receipts}
         uploading={uploading === 'RECEIPT'}
         onFiles={(files) => addPhotos('RECEIPT', files)}
         onRemove={(path) => update({ photos: expense.photos.filter((photo) => photo.path !== path) })}
       />
-      <PhotoPicker
-        title="Photos of the items"
-        help="Take pictures of what you bought, or choose them from your gallery."
-        photos={items}
-        uploading={uploading === 'ITEM'}
-        onFiles={(files) => addPhotos('ITEM', files)}
-        onRemove={(path) => update({ photos: expense.photos.filter((photo) => photo.path !== path) })}
-      />
+      {fields.showItems && (
+        <PhotoPicker
+          title={fields.itemsTitle}
+          help={fields.itemsHelp}
+          photos={items}
+          uploading={uploading === 'ITEM'}
+          onFiles={(files) => addPhotos('ITEM', files)}
+          onRemove={(path) => update({ photos: expense.photos.filter((photo) => photo.path !== path) })}
+        />
+      )}
+      {Number(expense.amount) > 0 && expense.photos.length === 0 && (
+        <Alert>
+          <AlertDescription className="text-base">{EXPENSE_PROOF_REQUIRED_MESSAGE}</AlertDescription>
+        </Alert>
+      )}
 
       {error && <p className="text-base text-destructive">{error}</p>}
 
@@ -200,6 +212,7 @@ function ExpenseDraftCard({
 function PhotoPicker({
   title,
   help,
+  required,
   photos,
   uploading,
   onFiles,
@@ -207,6 +220,7 @@ function PhotoPicker({
 }: {
   title: string
   help: string
+  required?: boolean
   photos: DraftExpensePhoto[]
   uploading: boolean
   onFiles: (files: FileList | null) => void
@@ -218,7 +232,10 @@ function PhotoPicker({
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-base font-medium">{title}</p>
+        <p className="text-base font-medium">
+          {title}
+          {required ? ' (required)' : ''}
+        </p>
         <p className="text-base text-muted-foreground">{help}</p>
       </div>
       <input

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { expenseProofFields } from '@/lib/expenses'
 
 export type ExpensePhotoView = {
   id?: string
@@ -12,34 +13,37 @@ export type ExpensePhotoView = {
 export function ExpensePhotoGallery({
   photos,
   receiptUrl,
+  expenseType,
 }: {
   photos?: ExpensePhotoView[] | null
   receiptUrl?: string | null
+  expenseType?: string
 }) {
   const [enlarged, setEnlarged] = useState<{ url: string; label: string } | null>(null)
+  const fields = expenseProofFields(expenseType || 'OTHER')
   const list: ExpensePhotoView[] = [...(photos || [])]
   if (receiptUrl && !list.some((photo) => photo.url === receiptUrl)) {
     list.unshift({ kind: 'RECEIPT', url: receiptUrl })
   }
   if (!list.length) return null
 
-  const receipts = list.filter((photo) => photo.kind === 'RECEIPT')
-  const items = list.filter((photo) => photo.kind !== 'RECEIPT')
+  const receipts = fields.showItems ? list.filter((photo) => photo.kind === 'RECEIPT') : list
+  const items = fields.showItems ? list.filter((photo) => photo.kind !== 'RECEIPT') : []
 
   return (
     <>
       <div className="space-y-3">
         {receipts.length > 0 && (
           <PhotoRow
-            title="Receipt"
+            title={fields.galleryProofTitle}
             photos={receipts}
-            label="Receipt"
+            label={fields.galleryProofLabel}
             onOpen={setEnlarged}
           />
         )}
         {items.length > 0 && (
           <PhotoRow
-            title="Items purchased"
+            title={fields.itemsTitle || 'Items purchased'}
             photos={items}
             label="Item"
             onOpen={setEnlarged}

@@ -1,7 +1,10 @@
 import {
   decideExpenseReview,
   expenseConfirmCopy,
+  expenseHasProof,
   expenseNotificationText,
+  expenseProofFields,
+  EXPENSE_PROOF_REQUIRED_MESSAGE,
   formatExpenseLabel,
 } from './expenses'
 import {
@@ -69,6 +72,20 @@ test('already reviewed expenses cannot be changed', () => {
 test('expense labels stay plain', () => {
   assert(formatExpenseLabel({ type: 'PARKING', note: 'Lot A' }) === 'Parking: Lot A', 'label with note')
   assert(formatExpenseLabel({ type: 'TRAVEL' }) === 'Travel', 'label without note')
+})
+
+test('every expense type, including parking, requires proof photos', () => {
+  assert(expenseHasProof([{ kind: 'RECEIPT' }]), 'receipt counts as proof')
+  assert(!expenseHasProof([]), 'empty is missing')
+  assert(!expenseHasProof(null), 'null is missing')
+  const parking = expenseProofFields('PARKING')
+  assert(parking.proofTitle.includes('Parking proof'), parking.proofTitle)
+  assert(parking.proofHelp.includes('meter'), parking.proofHelp)
+  assert(parking.proofHelp.includes('gallery'), parking.proofHelp)
+  assert(!parking.showItems, 'parking does not need item photos')
+  assert(expenseProofFields('MATERIALS').showItems, 'materials still has item photos')
+  assert(EXPENSE_PROOF_REQUIRED_MESSAGE.includes('parking receipt'), EXPENSE_PROOF_REQUIRED_MESSAGE)
+  assert(EXPENSE_PROOF_REQUIRED_MESSAGE.includes('meter'), EXPENSE_PROOF_REQUIRED_MESSAGE)
 })
 
 test('approval notification includes the expense amount but not payout keys', () => {

@@ -112,6 +112,22 @@ async function main() {
   assert(receipt.res.ok, `receipt upload failed: ${JSON.stringify(receipt.body)}`)
   const itemPhoto = await uploadPhoto(workerCookie, job.id, 'ITEM')
   assert(itemPhoto.res.ok, `item upload failed: ${JSON.stringify(itemPhoto.body)}`)
+  const materialsReceipt = await uploadPhoto(workerCookie, job.id, 'RECEIPT')
+  assert(materialsReceipt.res.ok, `materials receipt upload failed: ${JSON.stringify(materialsReceipt.body)}`)
+
+  await test('parking and other expenses cannot be submitted without a proof photo', async () => {
+    const missingJob = await postJob(buyerCookie, `Missing proof ${Date.now()}`)
+    await assignWorker(buyerCookie, workerCookie, missingJob.id)
+    const { res, body } = await jsonFetch(workerCookie, `/api/jobs/${missingJob.id}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({
+        results: {},
+        expenses: [{ type: 'PARKING', amount: 6, note: 'Street meter' }],
+      }),
+    })
+    assert(res.status === 400, `expected 400, got ${res.status} ${JSON.stringify(body)}`)
+    assert(/photo|receipt|meter/i.test(body.error || ''), body.error)
+  })
 
   const submitRes = await jsonFetch(workerCookie, `/api/jobs/${job.id}/submit`, {
     method: 'POST',
@@ -124,7 +140,12 @@ async function main() {
           note: 'Lot parking',
           photos: [receipt.body, itemPhoto.body],
         },
-        { type: 'MATERIALS', amount: 8, note: 'Supplies' },
+        {
+          type: 'MATERIALS',
+          amount: 8,
+          note: 'Supplies',
+          photos: [materialsReceipt.body],
+        },
       ],
     }),
   })
@@ -252,7 +273,12 @@ async function main() {
             note: 'Meter',
             photos: [extraReceipt.body, extraItem.body],
           },
-          { type: 'MATERIALS', amount: 4, note: 'Tape' },
+          {
+            type: 'MATERIALS',
+            amount: 4,
+            note: 'Tape',
+            photos: [await uploadPhoto(workerCookie, extraJob.id, 'RECEIPT').then((r) => r.body)],
+          },
         ],
       }),
     })
@@ -268,11 +294,12 @@ async function main() {
   await test('paying is allowed while an expense is still not approved, and that amount is left out', async () => {
     const extraJob = await postJob(buyerCookie, `Pending expense pay ${Date.now()}`)
     await assignWorker(buyerCookie, workerCookie, extraJob.id)
+    const meterProof = await uploadPhoto(workerCookie, extraJob.id, 'RECEIPT')
     await jsonFetch(workerCookie, `/api/jobs/${extraJob.id}/submit`, {
       method: 'POST',
       body: JSON.stringify({
         results: {},
-        expenses: [{ type: 'PARKING', amount: 5, note: 'Meter' }],
+        expenses: [{ type: 'PARKING', amount: 5, note: 'Meter', photos: [meterProof.body] }],
       }),
     })
     const { res, body } = await jsonFetch(buyerCookie, `/api/jobs/${extraJob.id}/approve`, {

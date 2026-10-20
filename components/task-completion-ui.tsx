@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { ExpenseComposer, emptyDraftExpense, type DraftExpense } from '@/components/expense-composer'
+import { EXPENSE_PROOF_REQUIRED_MESSAGE, expenseHasProof } from '@/lib/expenses'
 
 export function TaskCompletionUI({ assignment }: { assignment: any }) {
   const router = useRouter()
@@ -121,6 +122,13 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
   const handleSubmit = async () => {
     if (!canSubmit()) {
       setError('Please complete all required tasks')
+      return
+    }
+    const missingProof = expenses.some(
+      (expense) => Number(expense.amount) > 0 && !expenseHasProof(expense.photos)
+    )
+    if (missingProof) {
+      setError(EXPENSE_PROOF_REQUIRED_MESSAGE)
       return
     }
 
@@ -438,7 +446,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
           <CardHeader>
             <CardTitle>Expenses</CardTitle>
             <p className="text-base text-muted-foreground">
-              Add a receipt photo and photos of what you bought. The buyer can approve each expense. Anything not approved will not be paid.
+              Every expense needs a proof photo — a receipt, parking receipt, or meter/app screenshot. Take a photo or choose from your gallery. The buyer can approve each expense. Anything not approved will not be paid.
             </p>
           </CardHeader>
           <CardContent>
