@@ -54,7 +54,7 @@ export async function createJobPhoto(opts: {
       jobId: opts.jobId,
       ownerId: opts.ownerId,
       kind: opts.kind,
-      data: prepared.data,
+      data: new Uint8Array(prepared.data),
       contentType: prepared.contentType,
       size: prepared.size,
     },
