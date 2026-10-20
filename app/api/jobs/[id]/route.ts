@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-privacy'
+import { assignmentForDisplay } from '@/lib/assignment'
+import { presentAssignmentExpenses } from '@/lib/expense-photos'
+import { presentAssignmentWorkProof } from '@/lib/work-proof'
 
 export async function GET(
   _req: NextRequest,
@@ -21,7 +24,7 @@ export async function GET(
           include: { buyerProfile: true },
         },
         taskSections: {
-          include: { steps: true },
+          include: { steps: { orderBy: { order: 'asc' } } },
           orderBy: { order: 'asc' },
         },
         offers: {
@@ -37,11 +40,14 @@ export async function GET(
             worker: {
               include: { workerProfile: true },
             },
-            expenses: true,
+            expenses: {
+              include: { photos: true },
+            },
             taskResults: {
               include: {
                 files: true,
                 step: true,
+                proofPhotos: true,
               },
             },
           },
@@ -53,10 +59,21 @@ export async function GET(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    const role = moneyRoleForUser(user, job)
-    const fees = feesForJob(job, role)
+    const viewJob = { ...job, assignment: assignmentForDisplay(job) }
+    const role = moneyRoleForUser(user, viewJob)
+    const fees = feesForJob(viewJob, role)
+    const safeJob = {
+      ...viewJob,
+      assignment: presentAssignmentWorkProof(
+        viewJob.id,
+        presentAssignmentExpenses(viewJob.id, viewJob.assignment, user.id, viewJob.buyerId),
+        user.id,
+        viewJob.buyerId
+      ),
+      fees,
+    }
     return NextResponse.json(
-      omitCrossSideMoney({ job: { ...job, fees } }, role)
+      omitCrossSideMoney({ job: safeJob }, role)
     )
   } catch (error) {
     console.error('Get job error:', error)

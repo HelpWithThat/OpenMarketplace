@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { ReliabilityStat } from '@/components/reliability-stat'
 
 export function JobOffersList({ jobId, offers, onUpdate }: { jobId: string; offers: any[]; onUpdate: () => void }) {
   const [responding, setResponding] = useState<string | null>(null)
@@ -78,6 +79,13 @@ export function JobOffersList({ jobId, offers, onUpdate }: { jobId: string; offe
                 <p className="text-sm text-muted-foreground">
                   {new Date(offer.createdAt).toLocaleDateString()}
                 </p>
+                {offer.worker.workerProfile && (
+                  <ReliabilityStat
+                    completedJobs={offer.worker.workerProfile.completedJobs}
+                    acceptedJobs={offer.worker.workerProfile.acceptedJobs}
+                    className="mt-1 text-sm text-muted-foreground"
+                  />
+                )}
               </div>
               <Badge>{offer.status}</Badge>
             </div>

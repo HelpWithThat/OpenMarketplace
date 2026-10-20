@@ -2,7 +2,10 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import { JobDetailClient } from '@/components/job-detail-client'
-import { feesForJob, moneyRoleForUser } from '@/lib/fee-privacy'
+import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-privacy'
+import { assignmentForDisplay } from '@/lib/assignment'
+import { presentAssignmentExpenses } from '@/lib/expense-photos'
+import { presentAssignmentWorkProof } from '@/lib/work-proof'
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -19,7 +22,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         include: { buyerProfile: true },
       },
       taskSections: {
-        include: { steps: true },
+        include: { steps: { orderBy: { order: 'asc' } } },
         orderBy: { order: 'asc' },
       },
       offers: {
@@ -35,6 +38,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           worker: {
             include: { workerProfile: true },
           },
+          expenses: {
+            include: { photos: true },
+          },
+          taskResults: {
+            include: {
+              files: true,
+              step: true,
+              proofPhotos: true,
+            },
+          },
         },
       },
     },
@@ -44,11 +57,21 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     notFound()
   }
 
-  const role = moneyRoleForUser(user, job)
-  const fees = feesForJob(job, role)
+  const viewJob = { ...job, assignment: assignmentForDisplay(job) }
+  const role = moneyRoleForUser(user, viewJob)
+  const fees = feesForJob(viewJob, role)
+  const safeJob = {
+    ...viewJob,
+    assignment: presentAssignmentWorkProof(
+      viewJob.id,
+      presentAssignmentExpenses(viewJob.id, viewJob.assignment, userId, viewJob.buyerId),
+      userId,
+      viewJob.buyerId
+    ),
+  }
   return (
     <JobDetailClient
-      job={job}
+      job={omitCrossSideMoney(safeJob, role)}
       userId={userId}
       isWorker={user.isWorker}
       isBuyer={job.buyerId === userId}

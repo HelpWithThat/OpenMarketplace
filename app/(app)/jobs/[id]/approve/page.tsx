@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { BuyerFeeView } from '@/lib/fee-privacy'
+import { ExpenseList } from '@/components/expense-list'
+import { pendingExpenses, pendingPayReminderCopy, unapprovedExpensesNote } from '@/lib/expense-photos'
+import { WorkProofGallery } from '@/components/work-proof-gallery'
 
 export default function ApproveJobPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -19,8 +19,8 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState('')
   const [job, setJob] = useState<any>(null)
   const [jobId, setJobId] = useState<string>('')
-  const [approvedExpenses, setApprovedExpenses] = useState<string[]>([])
   const [note, setNote] = useState('')
+  const [continueWithout, setContinueWithout] = useState(false)
 
   useEffect(() => {
     params.then(p => setJobId(p.id))
@@ -35,10 +35,7 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
       const res = await fetch(`/api/jobs/${jobId}`)
       const data = await res.json()
       setJob(data.job)
-      // Auto-approve all expenses by default
-      if (data.job.assignment?.expenses) {
-        setApprovedExpenses(data.job.assignment.expenses.map((e: any) => e.id))
-      }
+      setContinueWithout(false)
     } catch (err) {
       setError('Failed to load job')
     } finally {
@@ -46,7 +43,7 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handleApprove = async () => {
+  const payWork = async () => {
     setError('')
     setSubmitting(true)
 
@@ -55,7 +52,6 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          approvedExpenses,
           note,
         }),
       })
@@ -84,10 +80,23 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
   const fees = job.fees as BuyerFeeView | undefined
   const laborValue = fees?.laborValue ?? job.assignment.agreedPay ?? job.fixedPrice ?? 0
   const yourFee = fees?.yourFee ?? 0
-  const totalExpenses = job.assignment.expenses
-    ?.filter((e: any) => approvedExpenses.includes(e.id))
-    .reduce((sum: number, e: any) => sum + e.amount, 0) || 0
+  const expenses: any[] = job.assignment.expenses || []
+  const pending = pendingExpenses(expenses)
+  const reminder = pendingPayReminderCopy(expenses)
+  const unapprovedNote = unapprovedExpensesNote(expenses)
+  const totalExpenses = expenses
+    .filter((e: any) => e.status === 'APPROVED')
+    .reduce((sum: number, e: any) => sum + e.amount, 0)
   const youPay = laborValue + yourFee + totalExpenses
+
+  const handlePayClick = async () => {
+    if (pending.length > 0 && !continueWithout) {
+      setContinueWithout(true)
+      setError('')
+      return
+    }
+    await payWork()
+  }
 
   return (
     <div className="container max-w-2xl space-y-6 px-4 py-8">
@@ -129,8 +138,8 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
         <CardContent className="space-y-4">
           {job.assignment.taskResults?.map((result: any) => (
             <div key={result.id} className="space-y-2">
-              <p className="text-sm font-medium">{result.step.title}</p>
-              {result.textValue && <p className="text-sm text-muted-foreground">{result.textValue}</p>}
+              <p className="text-base font-medium">{result.step.title}</p>
+              {result.textValue && <p className="text-base text-muted-foreground">{result.textValue}</p>}
               {result.files?.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {result.files.map((file: any) => (
@@ -149,53 +158,25 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
                   ))}
                 </div>
               )}
+              <WorkProofGallery photos={result.proofPhotos} />
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {job.assignment.expenses?.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Expenses</CardTitle>
-            <CardDescription>Review and approve expenses</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {job.assignment.expenses.map((expense: any) => (
-              <div key={expense.id} className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3 flex-1">
-                  <Checkbox
-                    id={expense.id}
-                    checked={approvedExpenses.includes(expense.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setApprovedExpenses([...approvedExpenses, expense.id])
-                      } else {
-                        setApprovedExpenses(approvedExpenses.filter(id => id !== expense.id))
-                      }
-                    }}
-                  />
-                  <Label htmlFor={expense.id} className="flex-1 cursor-pointer">
-                    <div>
-                      <p className="text-sm font-medium">{expense.description}</p>
-                      <p className="text-sm text-muted-foreground">${expense.amount.toFixed(2)}</p>
-                    </div>
-                  </Label>
-                </div>
-                {expense.receiptUrl && (
-                  <a
-                    href={expense.receiptUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary underline"
-                  >
-                    Receipt
-                  </a>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      {expenses.length > 0 && (
+        <ExpenseList
+          jobId={jobId}
+          expenses={expenses}
+          isBuyer
+          allowReview
+          onUpdate={loadJob}
+        />
+      )}
+      {unapprovedNote && (
+        <Alert>
+          <AlertDescription className="text-base">{unapprovedNote}</AlertDescription>
+        </Alert>
       )}
 
       <Card>
@@ -240,13 +221,77 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
         </CardContent>
       </Card>
 
-      <div className="flex gap-4">
-        <Button onClick={handleApprove} disabled={submitting} className="flex-1">
-          {submitting ? 'Approving...' : 'Approve & Pay'}
+      {(job.assignment.taskResults || []).some((result: any) => result.proofPhotos?.length) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Proof of work</CardTitle>
+            <CardDescription>Look at these photos before you pay.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(job.assignment.taskResults || [])
+              .filter((result: any) => result.proofPhotos?.length)
+              .map((result: any) => (
+                <div key={result.id} className="space-y-2">
+                  <p className="text-base font-medium">{result.step?.title}</p>
+                  <WorkProofGallery photos={result.proofPhotos} />
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {reminder && pending.length > 0 && (
+        <div className="space-y-3 rounded-xl border-2 border-primary p-1">
+          <ExpenseList
+            jobId={jobId}
+            expenses={pending}
+            isBuyer
+            allowReview
+            onUpdate={loadJob}
+            title={reminder.title}
+            description={reminder.body}
+          />
+        </div>
+      )}
+
+      {continueWithout && reminder && pending.length > 0 && (
+        <div className="space-y-3 rounded-lg bg-muted/50 p-4">
+          <p className="text-lg font-semibold">{reminder.confirmTitle}</p>
+          <p className="text-base leading-relaxed text-muted-foreground">{reminder.confirmBody}</p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <Button
+          onClick={handlePayClick}
+          disabled={submitting}
+          className="h-12 w-full text-base"
+          size="lg"
+        >
+          {submitting
+            ? 'Paying…'
+            : pending.length > 0
+              ? continueWithout
+                ? reminder?.confirmLabel
+                : reminder?.continueLabel
+              : 'Approve & Pay'}
         </Button>
-        <Button variant="outline" onClick={() => router.back()}>
-          Cancel
-        </Button>
+        {continueWithout && pending.length > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-12 w-full text-base"
+            disabled={submitting}
+            onClick={() => setContinueWithout(false)}
+          >
+            {reminder?.keepLabel}
+          </Button>
+        ) : (
+          <Button variant="outline" className="h-12 w-full text-base" onClick={() => router.back()}>
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   )

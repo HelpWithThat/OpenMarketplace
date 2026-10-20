@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Slider } from '@/components/ui/slider'
+import { formatReliability, RELIABILITY_SCORE_HELPER, RELIABILITY_SCORE_LABEL } from '@/lib/reliability'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -231,6 +232,23 @@ export default function ProfilePage() {
 
       {user?.isWorker && (
         <>
+          <Card>
+            <CardHeader>
+              <CardTitle>{RELIABILITY_SCORE_LABEL}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg font-medium">
+                {formatReliability({
+                  completedJobs: user.workerProfile?.completedJobs ?? 0,
+                  acceptedJobs: user.workerProfile?.acceptedJobs ?? 0,
+                })}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {RELIABILITY_SCORE_HELPER}
+              </p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Skills</CardTitle>

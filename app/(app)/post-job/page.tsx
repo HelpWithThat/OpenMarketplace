@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { WORK_PROOF_POST_HELP } from '@/lib/work-proof'
 
 export default function PostJobPage() {
   const router = useRouter()
@@ -37,23 +37,38 @@ export default function PostJobPage() {
     {
       name: 'Prep',
       steps: [
-        { type: 'CHECK_IN', title: 'Check in on arrival', required: true },
+        { type: 'CHECK_IN', title: 'Check in on arrival', required: true, photoProofRequired: false },
       ],
     },
     {
       name: 'On Site',
       steps: [
-        { type: 'PHOTO', title: 'Take before photos', required: true },
+        { type: 'PHOTO', title: 'Take before photos', required: true, photoProofRequired: false },
       ],
     },
     {
       name: 'Closeout',
       steps: [
-        { type: 'PHOTO', title: 'Take after photos', required: true },
-        { type: 'CHECK_OUT', title: 'Check out when complete', required: true },
+        { type: 'PHOTO', title: 'Take after photos', required: true, photoProofRequired: false },
+        { type: 'CHECK_OUT', title: 'Check out when complete', required: true, photoProofRequired: false },
       ],
     },
   ])
+
+  const updateTaskStep = (
+    sectionIndex: number,
+    stepIndex: number,
+    patch: Partial<(typeof taskSections)[number]['steps'][number]>
+  ) => {
+    const newSections = [...taskSections]
+    newSections[sectionIndex] = {
+      ...newSections[sectionIndex],
+      steps: newSections[sectionIndex].steps.map((step, index) =>
+        index === stepIndex ? { ...step, ...patch } : step
+      ),
+    }
+    setTaskSections(newSections)
+  }
 
   const addTaskStep = (sectionIndex: number) => {
     const newSections = [...taskSections]
@@ -61,6 +76,7 @@ export default function PostJobPage() {
       type: 'CHECKBOX',
       title: 'New task',
       required: false,
+      photoProofRequired: false,
     })
     setTaskSections(newSections)
   }
@@ -334,21 +350,60 @@ export default function PostJobPage() {
           <CardHeader>
             <CardTitle>Task Checklist</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {taskSections.map((section, sectionIndex) => (
-              <div key={sectionIndex} className="space-y-2">
-                <h3 className="font-semibold">{section.name}</h3>
+              <div key={sectionIndex} className="space-y-3">
+                <h3 className="text-lg font-semibold">{section.name}</h3>
                 {section.steps.map((step, stepIndex) => (
-                  <div key={stepIndex} className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">{step.type}</span>
-                    <span>{step.title}</span>
-                    {step.required && <span className="text-destructive">*</span>}
+                  <div
+                    key={stepIndex}
+                    className="space-y-3 rounded-xl border border-border p-4"
+                    data-testid={`task-step-${sectionIndex}-${stepIndex}`}
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor={`task-title-${sectionIndex}-${stepIndex}`} className="text-base">
+                        Task
+                      </Label>
+                      <Input
+                        id={`task-title-${sectionIndex}-${stepIndex}`}
+                        className="h-12 text-base"
+                        value={step.title}
+                        onChange={(e) => updateTaskStep(sectionIndex, stepIndex, { title: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-base font-medium">Require a photo when the task is done?</p>
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <Button
+                          type="button"
+                          size="lg"
+                          className="h-12 flex-1 text-base"
+                          variant={step.photoProofRequired ? 'default' : 'outline'}
+                          aria-pressed={step.photoProofRequired}
+                          onClick={() => updateTaskStep(sectionIndex, stepIndex, { photoProofRequired: true })}
+                        >
+                          Yes
+                        </Button>
+                        <Button
+                          type="button"
+                          size="lg"
+                          className="h-12 flex-1 text-base"
+                          variant={!step.photoProofRequired ? 'default' : 'outline'}
+                          aria-pressed={!step.photoProofRequired}
+                          onClick={() => updateTaskStep(sectionIndex, stepIndex, { photoProofRequired: false })}
+                        >
+                          No
+                        </Button>
+                      </div>
+                      <p className="text-base text-muted-foreground">{WORK_PROOF_POST_HELP}</p>
+                    </div>
                   </div>
                 ))}
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
+                  size="lg"
+                  className="h-12 w-full text-base"
                   onClick={() => addTaskStep(sectionIndex)}
                 >
                   Add Task to {section.name}

@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
                 title: step.title,
                 required: step.required,
                 instructions: step.instructions,
+                photoProofRequired: Boolean(step.photoProofRequired),
               })),
             },
           })),

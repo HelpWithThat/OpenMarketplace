@@ -56,12 +56,18 @@ export function feeSettingsFromEnv(): FeeSettings {
 }
 
 export function laborValueForJob(job: {
+  status?: string
   fixedPrice?: number | null
   hourlyRate?: number | null
   maxHours?: number | null
-  assignment?: { agreedPay?: number | null } | null
+  assignment?: { agreedPay?: number | null; status?: string } | null
 }): number {
-  if (job.assignment?.agreedPay != null) return job.assignment.agreedPay
+  const assignment = job.assignment
+  const assignmentIsCurrent =
+    assignment &&
+    assignment.status !== 'CANCELLED' &&
+    !(job.status === 'OPEN' && assignment.status === 'CANCELLED')
+  if (assignmentIsCurrent && assignment.agreedPay != null) return assignment.agreedPay
   if (job.fixedPrice != null) return job.fixedPrice
   return (job.hourlyRate || 0) * (job.maxHours || 0)
 }
@@ -102,7 +108,7 @@ export function feesForJob(
   const expenses =
     expensesTotal ??
     job.assignment?.expenses
-      ?.filter((e) => !e.status || e.status === 'APPROVED' || e.status === 'PENDING')
+      ?.filter((e) => e.status === 'APPROVED')
       .reduce((sum, e) => sum + e.amount, 0) ??
     0
   return feeViewForRole(calculateFees(labor, expenses, feeSettingsFromEnv()), role)

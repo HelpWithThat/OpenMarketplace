@@ -73,6 +73,17 @@ async function ensureOffer(id: string, data: Prisma.OfferUncheckedCreateInput) {
   return offer
 }
 
+async function ensureExpense(id: string, data: Prisma.ExpenseItemUncheckedCreateInput) {
+  const byId = await prisma.expenseItem.findUnique({ where: { id } })
+  if (byId) {
+    console.log(`  skip expense ${id} (already exists)`)
+    return byId
+  }
+  const expense = await prisma.expenseItem.create({ data: { ...data, id } })
+  console.log(`  created expense ${id}`)
+  return expense
+}
+
 async function ensureAssignment(id: string, data: Prisma.AssignmentUncheckedCreateInput) {
   const byId = await prisma.assignment.findUnique({ where: { id } })
   if (byId) {
@@ -560,7 +571,8 @@ async function main() {
     estimatedDuration: 180,
     payType: 'FIXED',
     fixedPrice: 120,
-    expensesAllowed: false,
+    expensesAllowed: true,
+    expenseBudget: 40,
     status: 'SUBMITTED',
     publishedAt: daysFromNow(-2),
   })
@@ -575,6 +587,22 @@ async function main() {
     status: 'SUBMITTED',
     submittedAt: new Date(),
     autoApproveAt: daysFromNow(3),
+  })
+
+  await ensureExpense('expense-submitted-parking', {
+    assignmentId: 'assignment-submitted',
+    type: 'PARKING',
+    amount: 12.5,
+    note: 'Warehouse lot parking',
+    status: 'PENDING',
+  })
+
+  await ensureExpense('expense-submitted-materials', {
+    assignmentId: 'assignment-submitted',
+    type: 'MATERIALS',
+    amount: 8,
+    note: 'Clipboard and pens',
+    status: 'PENDING',
   })
 
   await ensureThread({

@@ -2,6 +2,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect, notFound } from 'next/navigation'
 import { TaskCompletionUI } from '@/components/task-completion-ui'
+import { presentAssignmentWorkProof } from '@/lib/work-proof'
 
 export default async function WorkOnJobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -36,15 +37,24 @@ export default async function WorkOnJobPage({ params }: { params: Promise<{ id: 
       taskResults: {
         include: {
           files: true,
+          proofPhotos: true,
         },
       },
-      expenses: true,
+      expenses: {
+        include: { photos: true },
+      },
     },
   })
 
-  if (!assignment) {
+  if (!assignment || assignment.status === 'CANCELLED') {
     notFound()
   }
 
-  return <TaskCompletionUI assignment={assignment} />
+  const presented = presentAssignmentWorkProof(
+    id,
+    assignment,
+    userId,
+    assignment.job.buyerId
+  )
+  return <TaskCompletionUI assignment={presented} />
 }

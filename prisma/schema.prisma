@@ -346,6 +346,7 @@ model TaskStep {
   title       String
   instructions String?
   required    Boolean  @default(false)
+  photoProofRequired Boolean @default(false)
   
   // Settings (JSON for flexibility)
   settings    Json?    // {minPhotos: 2, maxPhotos: 5, choices: ["A", "B"], ...}
@@ -528,6 +529,7 @@ model TaskResult {
   
   // Files
   files       TaskResultFile[]
+  proofPhotos TaskProofPhoto[]
   
   // Signature
   signature   String?  // Base64 image
@@ -557,6 +559,20 @@ model TaskResultFile {
   @@index([resultId])
 }
 
+model TaskProofPhoto {
+  id          String   @id @default(cuid())
+  resultId    String
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  path        String
+  contentType String
+  size        Int
+
+  createdAt   DateTime @default(now())
+
+  @@index([resultId])
+}
+
 // ============================================================================
 // EXPENSES
 // ============================================================================
@@ -575,10 +591,32 @@ model ExpenseItem {
   approvedAt  DateTime?
   
   feeExempt   Boolean  @default(true) // Always true per plan
+
+  photos      ExpensePhoto[]
   
   createdAt   DateTime @default(now())
   
   @@index([assignmentId])
+}
+
+model ExpensePhoto {
+  id          String   @id @default(cuid())
+  expenseId   String
+  expense     ExpenseItem @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  kind        ExpensePhotoKind
+  path        String
+  contentType String
+  size        Int
+
+  createdAt   DateTime @default(now())
+
+  @@index([expenseId])
+}
+
+enum ExpensePhotoKind {
+  RECEIPT
+  ITEM
 }
 
 enum ExpenseType {
@@ -951,6 +989,8 @@ enum NotificationType {
   OFFER_ACCEPTED
   OFFER_DECLINED
   JOB_ASSIGNED
+  JOB_CANCELLED
+  EXPENSE_UPDATE
   MESSAGE_RECEIVED
   PAYMENT_APPROVED
   PAYMENT_RELEASED

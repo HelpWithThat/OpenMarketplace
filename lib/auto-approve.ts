@@ -5,6 +5,7 @@
 import { prisma } from './prisma'
 import { calculateFees } from './fees'
 import { getPaymentProvider } from './payments'
+import { bumpCompletedJobs } from './assignment'
 
 export async function checkAutoApprove(assignmentId: string) {
   const assignment = await prisma.assignment.findUnique({
@@ -24,22 +25,10 @@ export async function checkAutoApprove(assignmentId: string) {
     return false
   }
 
-  // Auto-approve: approve all pending expenses
-  await prisma.expenseItem.updateMany({
-    where: {
-      assignmentId,
-      status: 'PENDING',
-    },
-    data: {
-      status: 'APPROVED',
-      approvedAt: new Date(),
-    },
-  })
-
-  // Calculate final amounts
+  // Pay only expenses the buyer already approved. Anything not approved is left out.
   const laborValue = assignment.agreedPay
   const expensesTotal = assignment.expenses
-    .filter(e => e.status === 'APPROVED')
+    .filter((e) => e.status === 'APPROVED')
     .reduce((sum, e) => sum + e.amount, 0)
   const penaltiesTotal = assignment.penalties.reduce((sum, p) => sum + p.amount, 0)
 
@@ -104,6 +93,8 @@ export async function checkAutoApprove(assignmentId: string) {
     where: { id: assignment.jobId },
     data: { status: 'APPROVED' },
   })
+
+  await bumpCompletedJobs(assignment.workerId)
 
   await prisma.notification.create({
     data: {
