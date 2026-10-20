@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 
 import { prisma } from '@/lib/prisma'
+import { EXPENSE_PHOTO_MAX_PER_KIND, isExpensePhotoKind } from '@/lib/expense-photos'
+import { readOwnedExpensePhotoFile } from '@/lib/expense-photo-storage'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -68,18 +70,52 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Save expenses
     for (const expense of expenses || []) {
-      if (expense.amount > 0) {
-        await prisma.expenseItem.create({
-          data: {
-            assignmentId: assignment.id,
-            type: expense.type || 'OTHER',
-            amount: expense.amount,
-            note: expense.note,
-            receiptUrl: expense.receiptUrl,
-            status: 'PENDING',
-          },
+      if (!(expense.amount > 0)) continue
+
+      const incomingPhotos = Array.isArray(expense.photos) ? expense.photos : []
+      const photos = []
+      for (const photo of incomingPhotos) {
+        if (!isExpensePhotoKind(photo?.kind) || typeof photo?.path !== 'string') {
+          return NextResponse.json({ error: 'One of the expense photos could not be saved' }, { status: 400 })
+        }
+        const owned = await readOwnedExpensePhotoFile({
+          relativePath: photo.path,
+          jobId: id,
+          userId: userId,
+        })
+        if ('error' in owned) {
+          return NextResponse.json({ error: owned.error }, { status: 400 })
+        }
+        photos.push({
+          kind: photo.kind,
+          path: photo.path,
+          contentType: owned.contentType,
+          size: owned.size,
         })
       }
+      const receiptCount = photos.filter((p) => p.kind === 'RECEIPT').length
+      const itemCount = photos.filter((p) => p.kind === 'ITEM').length
+      if (receiptCount > EXPENSE_PHOTO_MAX_PER_KIND || itemCount > EXPENSE_PHOTO_MAX_PER_KIND) {
+        return NextResponse.json(
+          { error: `Please attach up to ${EXPENSE_PHOTO_MAX_PER_KIND} photos of each kind` },
+          { status: 400 }
+        )
+      }
+
+      await prisma.expenseItem.create({
+        data: {
+          assignmentId: assignment.id,
+          type: expense.type || 'OTHER',
+          amount: expense.amount,
+          note: expense.note,
+          status: 'PENDING',
+          photos: photos.length
+            ? {
+                create: photos,
+              }
+            : undefined,
+        },
+      })
     }
 
     // Update assignment status

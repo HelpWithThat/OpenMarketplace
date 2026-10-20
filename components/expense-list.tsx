@@ -6,11 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  expenseConfirmCopy,
-  formatExpenseLabel,
-  type ExpenseAction,
-} from '@/lib/expenses'
+import { expenseConfirmCopy, formatExpenseLabel } from '@/lib/expenses'
+import { expenseStatusLabel } from '@/lib/expense-photos'
+import { ExpensePhotoGallery, type ExpensePhotoView } from '@/components/expense-photo-gallery'
 
 type ExpenseItem = {
   id: string
@@ -19,12 +17,7 @@ type ExpenseItem = {
   note?: string | null
   receiptUrl?: string | null
   status: string
-}
-
-function statusLabel(status: string, isBuyer: boolean): string {
-  if (status === 'APPROVED') return 'Approved'
-  if (status === 'REJECTED') return 'Declined'
-  return isBuyer ? 'Waiting for you' : 'Waiting for the buyer'
+  photos?: ExpensePhotoView[] | null
 }
 
 export function ExpenseList({
@@ -33,29 +26,35 @@ export function ExpenseList({
   isBuyer,
   allowReview,
   onUpdate,
+  title,
+  description,
 }: {
   jobId: string
   expenses: ExpenseItem[]
   isBuyer: boolean
   allowReview?: boolean
   onUpdate?: () => void
+  title?: string
+  description?: string
 }) {
   if (!expenses?.length) return null
 
   const pending = expenses.filter((e) => e.status === 'PENDING')
   const canReview = isBuyer && (allowReview ?? true)
+  const heading = title || 'Expenses'
+  const details =
+    description ||
+    (isBuyer
+      ? pending.length > 0
+        ? 'Approve an expense to add it to what you pay, with no extra fee. Anything you do not approve will not be paid.'
+        : 'Approved expenses are added to what you pay. Anything not approved is left out.'
+      : 'Expenses you submitted for this job. Anything not approved will not be paid.')
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Expenses</CardTitle>
-        <CardDescription>
-          {isBuyer
-            ? pending.length > 0
-              ? 'Approve or decline each expense the worker submitted. Approved expenses are added to what you pay, with no extra fee.'
-              : 'These expenses have already been reviewed.'
-            : 'Expenses you submitted for this job.'}
-        </CardDescription>
+        <CardTitle>{heading}</CardTitle>
+        <CardDescription>{details}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {expenses.map((expense) => (
@@ -63,7 +62,6 @@ export function ExpenseList({
             key={expense.id}
             jobId={jobId}
             expense={expense}
-            isBuyer={isBuyer}
             canReview={canReview && expense.status === 'PENDING'}
             onUpdate={onUpdate}
           />
@@ -76,38 +74,35 @@ export function ExpenseList({
 function ExpenseRow({
   jobId,
   expense,
-  isBuyer,
   canReview,
   onUpdate,
 }: {
   jobId: string
   expense: ExpenseItem
-  isBuyer: boolean
   canReview: boolean
   onUpdate?: () => void
 }) {
   const router = useRouter()
-  const [confirm, setConfirm] = useState<ExpenseAction | null>(null)
+  const [confirm, setConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const copy = confirm ? expenseConfirmCopy(confirm, expense) : null
+  const copy = expenseConfirmCopy(expense)
 
   const handleConfirm = async () => {
-    if (!confirm) return
     setError('')
     setSubmitting(true)
     try {
       const res = await fetch(`/api/jobs/${jobId}/expenses/${expense.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: confirm, confirm: true }),
+        body: JSON.stringify({ action: 'approve', confirm: true }),
       })
       const data = await res.json()
       if (!res.ok) {
         throw new Error(data.error || 'Could not update this expense')
       }
-      setConfirm(null)
+      setConfirm(false)
       router.refresh()
       onUpdate?.()
     } catch (err: any) {
@@ -124,48 +119,26 @@ function ExpenseRow({
           <p className="text-base font-medium">{formatExpenseLabel(expense)}</p>
           <p className="text-lg font-bold">${Number(expense.amount).toFixed(2)}</p>
         </div>
-        <Badge>{statusLabel(expense.status, isBuyer)}</Badge>
+        <Badge>{expenseStatusLabel(expense.status)}</Badge>
       </div>
-      {expense.receiptUrl && (
-        <a
-          href={expense.receiptUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-base text-primary underline"
-        >
-          View receipt
-        </a>
-      )}
+
+      <ExpensePhotoGallery photos={expense.photos} receiptUrl={expense.receiptUrl} />
 
       {canReview && !confirm && (
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button
-            type="button"
-            size="lg"
-            className="h-12 flex-1 text-base"
-            onClick={() => {
-              setError('')
-              setConfirm('approve')
-            }}
-          >
-            Approve
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="h-12 flex-1 text-base"
-            onClick={() => {
-              setError('')
-              setConfirm('decline')
-            }}
-          >
-            Decline
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="lg"
+          className="h-12 w-full text-base"
+          onClick={() => {
+            setError('')
+            setConfirm(true)
+          }}
+        >
+          Approve
+        </Button>
       )}
 
-      {confirm && copy && (
+      {confirm && (
         <div className="space-y-3 rounded-lg bg-muted/50 p-3">
           <p className="text-lg font-semibold">{copy.title}</p>
           <p className="text-base leading-relaxed text-muted-foreground">{copy.body}</p>
@@ -190,7 +163,7 @@ function ExpenseRow({
               size="lg"
               className="h-12 w-full text-base"
               disabled={submitting}
-              onClick={() => setConfirm(null)}
+              onClick={() => setConfirm(false)}
             >
               {copy.keepLabel}
             </Button>

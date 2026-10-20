@@ -38,7 +38,9 @@ export default async function WorkOnJobPage({ params }: { params: Promise<{ id: 
           files: true,
         },
       },
-      expenses: true,
+      expenses: {
+        include: { photos: true },
+      },
     },
   })
 

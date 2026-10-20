@@ -575,10 +575,32 @@ model ExpenseItem {
   approvedAt  DateTime?
   
   feeExempt   Boolean  @default(true) // Always true per plan
+
+  photos      ExpensePhoto[]
   
   createdAt   DateTime @default(now())
   
   @@index([assignmentId])
+}
+
+model ExpensePhoto {
+  id          String   @id @default(cuid())
+  expenseId   String
+  expense     ExpenseItem @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  kind        ExpensePhotoKind
+  path        String
+  contentType String
+  size        Int
+
+  createdAt   DateTime @default(now())
+
+  @@index([expenseId])
+}
+
+enum ExpensePhotoKind {
+  RECEIPT
+  ITEM
 }
 
 enum ExpenseType {

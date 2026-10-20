@@ -25,22 +25,10 @@ export async function checkAutoApprove(assignmentId: string) {
     return false
   }
 
-  // Auto-approve: approve all pending expenses
-  await prisma.expenseItem.updateMany({
-    where: {
-      assignmentId,
-      status: 'PENDING',
-    },
-    data: {
-      status: 'APPROVED',
-      approvedAt: new Date(),
-    },
-  })
-
-  // Calculate final amounts (pending expenses were just approved above)
+  // Pay only expenses the buyer already approved. Anything not approved is left out.
   const laborValue = assignment.agreedPay
   const expensesTotal = assignment.expenses
-    .filter((e) => e.status !== 'REJECTED')
+    .filter((e) => e.status === 'APPROVED')
     .reduce((sum, e) => sum + e.amount, 0)
   const penaltiesTotal = assignment.penalties.reduce((sum, p) => sum + p.amount, 0)
 

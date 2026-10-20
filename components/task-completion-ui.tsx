@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,11 +11,19 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { ExpenseComposer, emptyDraftExpense, type DraftExpense } from '@/components/expense-composer'
 
 export function TaskCompletionUI({ assignment }: { assignment: any }) {
   const router = useRouter()
   const [results, setResults] = useState<Record<string, any>>({})
-  const [expenses, setExpenses] = useState<any[]>(assignment.expenses || [])
+  const [expenses, setExpenses] = useState<DraftExpense[]>(
+    (assignment.expenses || []).map((expense: any) => ({
+      type: expense.type || 'OTHER',
+      amount: expense.amount || '',
+      note: expense.note || '',
+      photos: [],
+    }))
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({})
@@ -86,20 +94,7 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
   }
 
   const addExpense = () => {
-    setExpenses(prev => [...prev, {
-      type: 'OTHER',
-      amount: 0,
-      note: '',
-      receiptUrl: null,
-    }])
-  }
-
-  const updateExpense = (index: number, field: string, value: any) => {
-    setExpenses(prev => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: value }
-      return updated
-    })
+    setExpenses((prev) => [...prev, emptyDraftExpense()])
   }
 
   const canSubmit = () => {
@@ -138,7 +133,19 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           results,
-          expenses,
+          expenses: expenses
+            .filter((expense) => Number(expense.amount) > 0)
+            .map((expense) => ({
+              type: expense.type,
+              amount: Number(expense.amount),
+              note: expense.note,
+              photos: expense.photos.map(({ path, kind, contentType, size }) => ({
+                path,
+                kind,
+                contentType,
+                size,
+              })),
+            })),
         }),
       })
 
@@ -430,46 +437,18 @@ export function TaskCompletionUI({ assignment }: { assignment: any }) {
         <Card>
           <CardHeader>
             <CardTitle>Expenses</CardTitle>
+            <p className="text-base text-muted-foreground">
+              Add a receipt photo and photos of what you bought. The buyer can approve each expense. Anything not approved will not be paid.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {expenses.map((expense, index) => (
-              <div key={index} className="space-y-2 border-b pb-4">
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <Input
-                    placeholder="Type"
-                    value={expense.type}
-                    onChange={(e) => updateExpense(index, 'type', e.target.value)}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Amount"
-                    value={expense.amount}
-                    onChange={(e) => updateExpense(index, 'amount', parseFloat(e.target.value))}
-                  />
-                  <Input
-                    placeholder="Note"
-                    value={expense.note}
-                    onChange={(e) => updateExpense(index, 'note', e.target.value)}
-                  />
-                </div>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={async (e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      const formData = new FormData()
-                      formData.append('file', e.target.files[0])
-                      const res = await fetch('/api/upload', { method: 'POST', body: formData })
-                      const data = await res.json()
-                      updateExpense(index, 'receiptUrl', data.url)
-                    }
-                  }}
-                />
-              </div>
-            ))}
-            <Button onClick={addExpense} variant="outline" size="sm">
-              Add Expense
-            </Button>
+          <CardContent>
+            {expenses.length === 0 ? (
+              <Button onClick={addExpense} variant="outline" size="lg" className="h-12 w-full text-base">
+                Add an expense
+              </Button>
+            ) : (
+              <ExpenseComposer jobId={job.id} expenses={expenses} onChange={setExpenses} />
+            )}
           </CardContent>
         </Card>
       )}

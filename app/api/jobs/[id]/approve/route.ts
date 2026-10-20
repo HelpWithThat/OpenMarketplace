@@ -40,14 +40,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const assignment = job.assignment
 
-    const pendingExpenses = assignment.expenses.filter((item) => item.status === 'PENDING')
-    if (pendingExpenses.length > 0) {
-      return NextResponse.json(
-        { error: 'Please approve or decline each expense before you pay' },
-        { status: 400 }
-      )
-    }
-
     // Calculate final amounts from expenses already approved on the job
     const laborValue = assignment.agreedPay
     const approvedExpensesTotal = assignment.expenses

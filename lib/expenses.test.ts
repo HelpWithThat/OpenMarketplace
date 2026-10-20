@@ -4,7 +4,14 @@ import {
   expenseNotificationText,
   formatExpenseLabel,
 } from './expenses'
+import {
+  canAccessJobExpenses,
+  expenseStatusLabel,
+  pendingPayReminderCopy,
+  unapprovedExpensesNote,
+} from './expense-photos'
 import { collectForbiddenMoneyKeys } from './fee-privacy'
+import { detectImageMime, isOwnedExpensePhotoPath, validateExpensePhotoBuffer } from './expense-photo-storage'
 
 let passed = 0
 let failed = 0
@@ -24,6 +31,11 @@ function test(name: string, fn: () => void) {
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
+
+const PNG_1x1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+)
 
 console.log('\n🧾 Expense review tests\n')
 
@@ -59,32 +71,78 @@ test('expense labels stay plain', () => {
   assert(formatExpenseLabel({ type: 'TRAVEL' }) === 'Travel', 'label without note')
 })
 
-test('notifications include the expense amount but not payout keys', () => {
+test('approval notification includes the expense amount but not payout keys', () => {
   const approved = expenseNotificationText({
-    action: 'approve',
     jobTitle: 'Count inventory',
     expense: { type: 'PARKING', note: 'Lot A', amount: 12.5 },
   })
-  const declined = expenseNotificationText({
-    action: 'decline',
-    jobTitle: 'Count inventory',
-    expense: { type: 'MATERIALS', note: 'Pens', amount: 8 },
-  })
   assert(approved.message.includes('$12.50'), 'approved notice has expense amount')
-  assert(declined.message.includes('$8.00'), 'declined notice has expense amount')
-  for (const note of [approved, declined]) {
-    assert(!/youPay|youGet|payout|penalty/i.test(note.title + note.message), note.message)
-    assert(collectForbiddenMoneyKeys(note, 'worker').length === 0, 'worker-forbidden keys in notice')
-    assert(collectForbiddenMoneyKeys(note, 'buyer').length === 0, 'buyer-forbidden keys in notice')
-  }
+  assert(!/declin/i.test(approved.title + approved.message), 'notice should not say declined')
+  assert(!/youPay|youGet|payout|penalty/i.test(approved.title + approved.message), approved.message)
+  assert(collectForbiddenMoneyKeys(approved, 'worker').length === 0, 'worker-forbidden keys in notice')
+  assert(collectForbiddenMoneyKeys(approved, 'buyer').length === 0, 'buyer-forbidden keys in notice')
 })
 
-test('confirm copy tells the buyer they will or will not pay the expense', () => {
-  const approve = expenseConfirmCopy('approve', { type: 'PARKING', amount: 12.5, note: 'Lot A' })
-  const decline = expenseConfirmCopy('decline', { type: 'PARKING', amount: 12.5, note: 'Lot A' })
+test('confirm copy tells the buyer they will pay the expense', () => {
+  const approve = expenseConfirmCopy({ type: 'PARKING', amount: 12.5, note: 'Lot A' })
   assert(approve.body.includes('$12.50'), 'approve mentions amount')
-  assert(decline.body.includes('will not pay'), 'decline says will not pay')
-  assert(!/youGet|workerPayout/i.test(approve.body + decline.body), 'no worker payout in confirm copy')
+  assert(!/declin/i.test(approve.title + approve.body), 'confirm should not say decline')
+  assert(!/youGet|workerPayout/i.test(approve.body), 'no worker payout in confirm copy')
+})
+
+test('UI status is Approved or Not approved, never declined', () => {
+  assert(expenseStatusLabel('APPROVED') === 'Approved', 'approved')
+  assert(expenseStatusLabel('PENDING') === 'Not approved', 'pending')
+  assert(expenseStatusLabel('REJECTED') === 'Not approved', 'legacy rejected')
+})
+
+test('pay-page note lists expenses that are not approved', () => {
+  const note = unapprovedExpensesNote([
+    { status: 'APPROVED', type: 'PARKING', note: 'Lot', amount: 12.5 },
+    { status: 'PENDING', type: 'MATERIALS', note: 'Pens', amount: 8 },
+  ])
+  assert(note, 'expected a note')
+  assert(note.includes('Materials: Pens'), 'lists the unapproved expense')
+  assert(note.includes('$8.00'), 'lists the amount')
+  assert(!note.includes('Parking'), 'does not list approved expenses')
+  assert(!/declin/i.test(note), 'does not say declined')
+})
+
+test('pay reminder lists each pending expense so they cannot be missed', () => {
+  const reminder = pendingPayReminderCopy([
+    { status: 'APPROVED', type: 'PARKING', note: 'Lot', amount: 12.5 },
+    { status: 'PENDING', type: 'MATERIALS', note: 'Pens', amount: 8 },
+    { status: 'PENDING', type: 'TRAVEL', note: 'Bus', amount: 3 },
+  ])
+  assert(reminder, 'expected a reminder when expenses are still pending')
+  assert(reminder.title.includes('before you pay'), reminder.title)
+  assert(reminder.confirmBody.includes('Materials: Pens'), 'lists first pending expense')
+  assert(reminder.confirmBody.includes('Travel: Bus'), 'lists second pending expense')
+  assert(!reminder.confirmBody.includes('Parking'), 'does not treat approved expenses as pending')
+  assert(!/declin/i.test(JSON.stringify(reminder)), 'reminder should not say declined')
+  assert(pendingPayReminderCopy([{ status: 'APPROVED', type: 'PARKING', amount: 5 }]) === null, 'no reminder when none pending')
+})
+
+test('only the job buyer and assigned worker can see expense photos', () => {
+  const job = { buyerId: 'buyer-1', assignment: { workerId: 'worker-1' } }
+  assert(canAccessJobExpenses('buyer-1', job), 'buyer')
+  assert(canAccessJobExpenses('worker-1', job), 'worker')
+  assert(!canAccessJobExpenses('stranger', job), 'stranger')
+})
+
+test('expense photo paths stay scoped to the worker and job', () => {
+  assert(isOwnedExpensePhotoPath('expenses/job-1/user-1/a.jpg', 'job-1', 'user-1'), 'owned')
+  assert(!isOwnedExpensePhotoPath('expenses/job-1/user-2/a.jpg', 'job-1', 'user-1'), 'other user')
+  assert(!isOwnedExpensePhotoPath('expenses/job-1/user-1/../secret.jpg', 'job-1', 'user-1'), 'traversal')
+  assert(!isOwnedExpensePhotoPath('other/job-1/user-1/a.jpg', 'job-1', 'user-1'), 'wrong folder')
+})
+
+test('photo validation accepts a PNG and rejects non-images', () => {
+  const ok = validateExpensePhotoBuffer(PNG_1x1)
+  assert(ok.ok && ok.contentType === 'image/png', 'png accepted')
+  assert(detectImageMime(PNG_1x1) === 'image/png', 'png detected')
+  const bad = validateExpensePhotoBuffer(Buffer.from('not-an-image-file-here'))
+  assert(!bad.ok, 'text rejected')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

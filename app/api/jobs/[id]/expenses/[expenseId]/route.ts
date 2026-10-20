@@ -25,14 +25,20 @@ export async function POST(
       confirm = false
     }
 
-    if (!confirm) {
+    if (action === 'decline' || action === 'reject') {
       return NextResponse.json(
-        { error: 'Please confirm that you want to approve or decline this expense' },
+        { error: 'Expenses that are not approved are simply left out of payment' },
         { status: 400 }
       )
     }
-    if (action !== 'approve' && action !== 'decline') {
-      return NextResponse.json({ error: 'Choose approve or decline' }, { status: 400 })
+    if (!confirm) {
+      return NextResponse.json(
+        { error: 'Please confirm that you want to approve this expense' },
+        { status: 400 }
+      )
+    }
+    if (action !== 'approve') {
+      return NextResponse.json({ error: 'Choose approve' }, { status: 400 })
     }
 
     const job = await prisma.job.findUnique({
@@ -61,17 +67,15 @@ export async function POST(
       return NextResponse.json({ error: decision.error }, { status: decision.status })
     }
 
-    const nextStatus = action === 'approve' ? 'APPROVED' : 'REJECTED'
     const updated = await prisma.expenseItem.update({
       where: { id: expense.id },
       data: {
-        status: nextStatus,
-        approvedAt: action === 'approve' ? new Date() : null,
+        status: 'APPROVED',
+        approvedAt: new Date(),
       },
     })
 
     const note = expenseNotificationText({
-      action,
       jobTitle: job.title,
       expense,
     })

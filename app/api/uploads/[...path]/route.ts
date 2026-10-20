@@ -25,6 +25,9 @@ export async function GET(
   if (!segments?.length) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
+  if (segments[0] === 'expenses') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
 
   const resolved = path.resolve(UPLOAD_ROOT, ...segments)
   if (resolved !== UPLOAD_ROOT && !resolved.startsWith(UPLOAD_ROOT + path.sep)) {

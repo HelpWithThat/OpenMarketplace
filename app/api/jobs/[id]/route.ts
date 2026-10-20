@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-privacy'
 import { assignmentForDisplay } from '@/lib/assignment'
+import { presentAssignmentExpenses } from '@/lib/expense-photos'
 
 export async function GET(
   _req: NextRequest,
@@ -38,7 +39,9 @@ export async function GET(
             worker: {
               include: { workerProfile: true },
             },
-            expenses: true,
+            expenses: {
+              include: { photos: true },
+            },
             taskResults: {
               include: {
                 files: true,
@@ -57,8 +60,13 @@ export async function GET(
     const viewJob = { ...job, assignment: assignmentForDisplay(job) }
     const role = moneyRoleForUser(user, viewJob)
     const fees = feesForJob(viewJob, role)
+    const safeJob = {
+      ...viewJob,
+      assignment: presentAssignmentExpenses(viewJob.id, viewJob.assignment, user.id, viewJob.buyerId),
+      fees,
+    }
     return NextResponse.json(
-      omitCrossSideMoney({ job: { ...viewJob, fees } }, role)
+      omitCrossSideMoney({ job: safeJob }, role)
     )
   } catch (error) {
     console.error('Get job error:', error)

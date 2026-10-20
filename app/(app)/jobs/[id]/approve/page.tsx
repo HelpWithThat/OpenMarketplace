@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Textarea } from '@/components/ui/textarea'
 import type { BuyerFeeView } from '@/lib/fee-privacy'
 import { ExpenseList } from '@/components/expense-list'
+import { pendingExpenses, pendingPayReminderCopy, unapprovedExpensesNote } from '@/lib/expense-photos'
 
 export default function ApproveJobPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -19,6 +19,7 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
   const [job, setJob] = useState<any>(null)
   const [jobId, setJobId] = useState<string>('')
   const [note, setNote] = useState('')
+  const [continueWithout, setContinueWithout] = useState(false)
 
   useEffect(() => {
     params.then(p => setJobId(p.id))
@@ -33,6 +34,7 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
       const res = await fetch(`/api/jobs/${jobId}`)
       const data = await res.json()
       setJob(data.job)
+      setContinueWithout(false)
     } catch (err) {
       setError('Failed to load job')
     } finally {
@@ -40,7 +42,7 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handleApprove = async () => {
+  const payWork = async () => {
     setError('')
     setSubmitting(true)
 
@@ -78,11 +80,22 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
   const laborValue = fees?.laborValue ?? job.assignment.agreedPay ?? job.fixedPrice ?? 0
   const yourFee = fees?.yourFee ?? 0
   const expenses = job.assignment.expenses || []
-  const pendingExpenses = expenses.filter((e: any) => e.status === 'PENDING')
+  const pending = pendingExpenses(expenses)
+  const reminder = pendingPayReminderCopy(expenses)
+  const unapprovedNote = unapprovedExpensesNote(expenses)
   const totalExpenses = expenses
     .filter((e: any) => e.status === 'APPROVED')
     .reduce((sum: number, e: any) => sum + e.amount, 0)
   const youPay = laborValue + yourFee + totalExpenses
+
+  const handlePayClick = async () => {
+    if (pending.length > 0 && !continueWithout) {
+      setContinueWithout(true)
+      setError('')
+      return
+    }
+    await payWork()
+  }
 
   return (
     <div className="container max-w-2xl space-y-6 px-4 py-8">
@@ -158,11 +171,9 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
           onUpdate={loadJob}
         />
       )}
-      {pendingExpenses.length > 0 && (
+      {unapprovedNote && (
         <Alert>
-          <AlertDescription className="text-base">
-            Please approve or decline each expense before you pay.
-          </AlertDescription>
+          <AlertDescription className="text-base">{unapprovedNote}</AlertDescription>
         </Alert>
       )}
 
@@ -208,18 +219,58 @@ export default function ApproveJobPage({ params }: { params: Promise<{ id: strin
         </CardContent>
       </Card>
 
-      <div className="flex gap-4">
+      {reminder && pending.length > 0 && (
+        <div className="space-y-3 rounded-xl border-2 border-primary p-1">
+          <ExpenseList
+            jobId={jobId}
+            expenses={pending}
+            isBuyer
+            allowReview
+            onUpdate={loadJob}
+            title={reminder.title}
+            description={reminder.body}
+          />
+        </div>
+      )}
+
+      {continueWithout && reminder && pending.length > 0 && (
+        <div className="space-y-3 rounded-lg bg-muted/50 p-4">
+          <p className="text-lg font-semibold">{reminder.confirmTitle}</p>
+          <p className="text-base leading-relaxed text-muted-foreground">{reminder.confirmBody}</p>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
         <Button
-          onClick={handleApprove}
-          disabled={submitting || pendingExpenses.length > 0}
-          className="h-12 flex-1 text-base"
+          onClick={handlePayClick}
+          disabled={submitting}
+          className="h-12 w-full text-base"
           size="lg"
         >
-          {submitting ? 'Approving...' : 'Approve & Pay'}
+          {submitting
+            ? 'Paying…'
+            : pending.length > 0
+              ? continueWithout
+                ? reminder?.confirmLabel
+                : reminder?.continueLabel
+              : 'Approve & Pay'}
         </Button>
-        <Button variant="outline" onClick={() => router.back()}>
-          Cancel
-        </Button>
+        {continueWithout && pending.length > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="h-12 w-full text-base"
+            disabled={submitting}
+            onClick={() => setContinueWithout(false)}
+          >
+            {reminder?.keepLabel}
+          </Button>
+        ) : (
+          <Button variant="outline" className="h-12 w-full text-base" onClick={() => router.back()}>
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   )

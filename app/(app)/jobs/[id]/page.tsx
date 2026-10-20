@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import { JobDetailClient } from '@/components/job-detail-client'
 import { feesForJob, moneyRoleForUser, omitCrossSideMoney } from '@/lib/fee-privacy'
 import { assignmentForDisplay } from '@/lib/assignment'
+import { presentAssignmentExpenses } from '@/lib/expense-photos'
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -36,7 +37,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           worker: {
             include: { workerProfile: true },
           },
-          expenses: true,
+          expenses: {
+            include: { photos: true },
+          },
         },
       },
     },
@@ -49,9 +52,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const viewJob = { ...job, assignment: assignmentForDisplay(job) }
   const role = moneyRoleForUser(user, viewJob)
   const fees = feesForJob(viewJob, role)
+  const safeJob = {
+    ...viewJob,
+    assignment: presentAssignmentExpenses(viewJob.id, viewJob.assignment, userId, viewJob.buyerId),
+  }
   return (
     <JobDetailClient
-      job={omitCrossSideMoney(viewJob, role)}
+      job={omitCrossSideMoney(safeJob, role)}
       userId={userId}
       isWorker={user.isWorker}
       isBuyer={job.buyerId === userId}
